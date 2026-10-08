@@ -239,7 +239,7 @@ form {
     min-height: 2.5rem;
     padding: 0.55rem 0.7rem;
     border: 1px solid #d1d5db;
-    border-radius: 3px;
+    border-radius: 15px;
     box-sizing: border-box;
     background: #fff;
 }
@@ -261,10 +261,10 @@ form {
 }
 
 .btn-guardar {
-    background-color: #057559;
+    background-color: #17b473;
     color: white;
-    border: 3px solid #00aa1c;
-    border-image: linear-gradient(45deg, #00aa1c, #0000ff) 1;
+    border: 3px solid #17b473;
+    border-image: blue;
     /* Define los dos colores y el ángulo */
     padding: 20px;
     padding: 0.4rem 1.5rem;
@@ -333,7 +333,7 @@ h4 {
     text-align: center;
     margin-bottom: 1rem;
     font-weight: 600;
-    background-color: #07c751;
+    background-color: #17b473;
     color: white;
 }
 

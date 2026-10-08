@@ -18,7 +18,7 @@ footer {
 }
 
 .footer {
-  background: #1b6534;
+  background: #17b473;
   color: white;
   text-align: center;
   padding: 0.2rem;

@@ -439,12 +439,20 @@ form {
   border: 1px solid #ddd;
   border-radius: 0px;
   width: 100%;
+  background-color: #fff;
+  color: #333;
+}
+
+.campo select option {
+  background-color: #fff;
+  color: #333;
 }
 
 .campo-provincia {
   flex: 1;
   /* ocupa menos espacio */
   border-radius: 0px;
+  
 }
 
 .campo label {
@@ -455,19 +463,30 @@ form {
 }
 
 .campo input {
+  background-color: #f9f9f9;
   flex: 1;
   /* ocupa todo el espacio restante */
   padding: 0.5rem;
   border: 1px solid #ddd;
-  border-radius: 0px;
+  border-radius: 15px;
   box-sizing: border-box;
+  color: #333;
+}
+
+.fila > button:not(.btn-guardar) {
+  align-self: center;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 15px;
+  box-sizing: border-box;
+  cursor: pointer;
 }
 
 .btn-guardar {
-  background-color: #057559;
+  background-color: #30c9a3;
   color: white;
-  border: 3px solid #00aa1c;
-  border-image: linear-gradient(45deg, #00aa1c, #0000ff) 1;
+  border: 3px solid #6fd6bc;
+  border-image: white;
   /* Define los dos colores y el ángulo */
   padding: 20px;
   padding: 0.4rem 1.5rem;
@@ -484,7 +503,7 @@ form {
 
 .btn-guardar:disabled {
   background-color: #e0e0e0;
-  color: #999;
+  color: #979696;
   border-color: #ccc;
   cursor: not-allowed;
   opacity: 0.7
@@ -534,7 +553,7 @@ h4 {
   text-align: center;
   margin-bottom: 1rem;
   font-weight: 600;
-  background-color: #07c751;
+  background-color: #17b473;
   color: white;
 }
 
@@ -553,6 +572,10 @@ h4 {
 
   .campo-dni {
     background-color: red;
+  }
+
+  .fila > button:not(.btn-guardar) {
+    width: 100%;
   }
 }
 </style>
