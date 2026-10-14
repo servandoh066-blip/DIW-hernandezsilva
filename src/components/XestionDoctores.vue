@@ -132,6 +132,51 @@ const novoDoctor = reactive({
   espedoc: "",
 });
 
+
+
+async function guardarDoctor() {
+  try {
+    if (editando.value) {
+      const doctorModificado = await modifyDoctor(
+        novoDoctor.iddoc,
+        novoDoctor
+      );
+
+      const index = doctores.value.findIndex(
+        (d) => d.iddoc === novoDoctor.iddoc
+      );
+
+      if (index !== -1) {
+        doctores.value[index] = doctorModificado;
+      }
+
+      console.log("Doctor modificado correctamente");
+      await clear();
+    } else {
+      const doctorGuardado = await saveDoctor(novoDoctor);
+      doctores.value.push(doctorGuardado);
+      
+      console.log("Doctor gardado con éxito");
+      
+      await clear();
+      
+    }
+    
+    editando.value = false;
+
+    /*
+    const pacienteGuardado = await savePaciente(novoPaciente);
+    pacientes.value.push(pacienteGuardado);
+    console.log("Paciente gardado correctamente");
+    getPacientes();
+    Object.assign(novoPaciente, { dnipac: "", nomepac: "", apelpac: "", mailpac: "", propac: "", munipac: "", movilpac: "", dirpac: "", nacipac: "" })
+    cargarMunicipios(); // Reinicia a lista de municipios ao gardar un paciente
+    */
+  } catch (error) {
+    console.error("Erro ao gardar o doctor:", error);
+  }
+}
+
 // Funciones auxiliares
 function corrixirNome() {
   if (novoDoctor.nomedoc.length > 0) {
