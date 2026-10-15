@@ -198,6 +198,8 @@ async function guardarPaciente() {
   }
   try {
     if (editando.value) {
+      const respuesta = await alertaConfirmacion("¿Estás seguro de modificar este paciente?");
+      if (respuesta.isConfirmed) {
       const pacienteModificado = await modifyPaciente(
         novoPaciente.dnipac,
         novoPaciente
@@ -210,30 +212,23 @@ async function guardarPaciente() {
       if (index !== -1) {
         pacientes.value[index] = pacienteModificado;
       }
-
-      console.log("Paciente modificado correctamente");
-      await clear();
+      alertaExito("Paciente modificado con éxito");
+      } else {
+        return;
+      }
     } else {
-      const pacienteGuardado = await savePaciente(novoPaciente);
-      pacientes.value.push(pacienteGuardado);
-      
-      console.log("Paciente gardado con éxito");
+      const respuesta = await alertaConfirmacion("¿Estás seguro de gardar este paciente?");
+      if(respuesta.isConfirmed) {
+      await savePaciente(novoPaciente);
       alertaExito("Paciente gardado con éxito");
-      
+      getPacientes();
+    }else { 
+      return;
       await clear();
       
     }
-    
+  }
     editando.value = false;
-
-    /*
-    const pacienteGuardado = await savePaciente(novoPaciente);
-    pacientes.value.push(pacienteGuardado);
-    console.log("Paciente gardado correctamente");
-    getPacientes();
-    Object.assign(novoPaciente, { dnipac: "", nomepac: "", apelpac: "", mailpac: "", propac: "", munipac: "", movilpac: "", dirpac: "", nacipac: "" })
-    cargarMunicipios(); // Reinicia a lista de municipios ao gardar un paciente
-    */
   } catch (error) {
     console.error("Erro ao gardar o paciente:", error);
     alertaError("Erro ao gardar o paciente. Contacte con el administrador.");
@@ -255,11 +250,18 @@ function gardarPaciente() {
       */
      async function eliminarPaciente(index) {
        try {
+        const confirmacion = await alertaConfirmacion("¿Estás seguro?");
+        if(confirmacion.isConfirmed) {
          await deletePaciente(pacientes.value[index].dnipac);
          pacientes.value.splice(index, 1)
     console.log("Paciente eliminado correctamente");
     alertaExito("Paciente eliminado con éxito");
     getPacientes();
+        }
+        else {
+          console.log("Eliminación cancelada");
+          return;
+        }
   } catch (error) {
     console.error("Erro ao eliminar o paciente:", error);
     alertaError("Erro ao eliminar o paciente. Contacte con el administrador.");
