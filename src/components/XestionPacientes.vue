@@ -127,6 +127,7 @@ import {
   modifyPaciente,
   getPacienteByDni
 } from "../api/pacientes.js"
+import { alertaConfirmacion, alertaExito, alertaError } from "../utils/alertas.js"
 
 const provincias = ref([])
 const municipios = ref([])
@@ -217,6 +218,7 @@ async function guardarPaciente() {
       pacientes.value.push(pacienteGuardado);
       
       console.log("Paciente gardado con éxito");
+      alertaExito("Paciente gardado con éxito");
       
       await clear();
       
@@ -234,6 +236,7 @@ async function guardarPaciente() {
     */
   } catch (error) {
     console.error("Erro ao gardar o paciente:", error);
+    alertaError("Erro ao gardar o paciente. Contacte con el administrador.");
   }
 }
 
@@ -255,9 +258,11 @@ function gardarPaciente() {
          await deletePaciente(pacientes.value[index].dnipac);
          pacientes.value.splice(index, 1)
     console.log("Paciente eliminado correctamente");
+    alertaExito("Paciente eliminado con éxito");
     getPacientes();
   } catch (error) {
     console.error("Erro ao eliminar o paciente:", error);
+    alertaError("Erro ao eliminar o paciente. Contacte con el administrador.");
   }
   pacientes.value.splice(index, 1);   //elimina o paciente da lista
 }
