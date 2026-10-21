@@ -213,19 +213,19 @@ async function guardarPaciente() {
         pacientes.value[index] = pacienteModificado;
       }
       alertaExito("Paciente modificado con éxito");
+      await clear();
       } else {
         return;
       }
     } else {
       const respuesta = await alertaConfirmacion("¿Estás seguro de gardar este paciente?");
       if(respuesta.isConfirmed) {
-      await savePaciente(novoPaciente);
+      const pacienteGuardado = await savePaciente(novoPaciente);
+      pacientes.value.push(pacienteGuardado);
       alertaExito("Paciente gardado con éxito");
-      getPacientes();
+      await clear();
     }else { 
       return;
-      await clear();
-      
     }
   }
     editando.value = false;
