@@ -5,10 +5,10 @@
             <div class="fila">
                 <div class="campo campo-id">
                     <label>ID:</label>
-                    <input v-model="novoDoctor._id" v-on:input="novoDoctor._id = novoDoctor._id.toUpperCase()"
+                    <input v-model="novoDoctor.iddoc" v-on:input="novoDoctor.iddoc = novoDoctor.iddoc.toUpperCase()"
                         type="text" required style="text-align: center;" />
                 </div>
-                <div v-if="novoDoctor._id !== '' && (!validarDni() || !validarDni2())" class="error-message">
+                <div v-if="novoDoctor.iddoc !== '' && (!validarDni() || !validarDni2())" class="error-message">
                     <p class="error">O DNI/CIF non é válido</p>
                 </div>
                 <button type="button" @click="limpiaFormpac">Limpar</button>
@@ -86,7 +86,7 @@
             <tbody>
                 <tr v-for="(u, index) in pacientes" :key="index">
                     <td style="text-align: center;">{{ index + 1 }}</td>
-                    <td style="text-align: center;">{{ u._id }}</td>
+                    <td style="text-align: center;">{{ u.iddoc }}</td>
                     <td>{{ u.apeldoc }}</td>
                     <td>{{ u.nomedoc }}</td>
                     <td>{{ u.movildoc }}</td>
@@ -123,7 +123,7 @@ const doctores = ref([])  //almacena la lista de doctores e os seus cambios
 const especialidades = ref([])
 
 const novoDoctor = reactive({
-  _id: "",
+  iddoc: "",
   nomedoc: "",
   apeldoc: "",
   maildoc: "",
@@ -138,12 +138,12 @@ async function guardarDoctor() {
   try {
     if (editando.value) {
       const doctorModificado = await modifyDoctor(
-        novoDoctor._id,
+        novoDoctor.iddoc,
         novoDoctor
       );
 
       const index = doctores.value.findIndex(
-        (d) => d._id === novoDoctor._id
+        (d) => d.iddoc === novoDoctor.iddoc
       );
 
       if (index !== -1) {
@@ -213,7 +213,7 @@ onMounted(cargarEspecialidades)
 
 const limpiaFormdoc = () => {
   Object.assign(novoDoctor, {
-    _id: "",
+    iddoc: "",
     nomedoc: "",
     apeldoc: "",
     maildoc: "",
