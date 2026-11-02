@@ -205,6 +205,12 @@ function corrixirApelido() {
   }
 }
 
+async function carregarEspecialidades() {
+  especialidades.value = await obtenerEspecialidades()
+}
+
+onMounted(cargarEspecialidades)
+
 const limpiaFormdoc = () => {
   Object.assign(novoDoctor, {
     _id: "",
@@ -287,6 +293,7 @@ form {
     border-radius: 15px;
     box-sizing: border-box;
     background: #fff;
+    color: #000;
 }
 
 .campo input:focus,
