@@ -11,8 +11,8 @@
                 <div v-if="novoDoctor.iddoc !== '' && (!validarDni() || !validarDni2())" class="error-message">
                     <p class="error">O DNI/CIF non é válido</p>
                 </div>
-                <button type="button" @click="limpiaFormpac">Limpar</button>
-                <button type="button" @click="buscarPaciente">Buscar</button>
+                <button type="button" @click="limpiaFormdoc">Limpar</button>
+                <button type="button" @click="buscarDoctor">Buscar</button>
                 <div class="campo campo-nome">
                     <label>Nome:</label>
                     <input v-model="novoDoctor.nomedoc" type="text" @keyup.enter="corrixirNome()" @blur="corrixirNome()"
@@ -75,6 +75,7 @@
         <table v-if="doctores.length > 0">
             <thead>
                 <tr>
+                    <th>#</th>
                     <th>ID</th>
                     <th>Apelidos</th>
                     <th>Nome</th>
@@ -84,7 +85,7 @@
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="(u, index) in pacientes" :key="index">
+                <tr v-for="(u, index) in doctores" :key="u._id || u.iddoc">
                     <td style="text-align: center;">{{ index + 1 }}</td>
                     <td style="text-align: center;">{{ u.iddoc }}</td>
                     <td>{{ u.apeldoc }}</td>
@@ -92,10 +93,10 @@
                     <td>{{ u.movildoc }}</td>
                     <td style="text-align: center;">{{ u.espedoc }}</td>
                     <td style="text-align: center;">
-                        <button @click="editarUsuario(index)" title="Editar">
+                        <button @click="editarDoctor(index)" title="Editar">
                             ✏️
                         </button>
-                        <button @click="eliminarPaciente(index)" title="Eliminar">
+                        <button @click="eliminarDoctor(index)" title="Eliminar">
                             🗑️
                         </button>
                     </td>
@@ -121,6 +122,7 @@
     
 const doctores = ref([])  //almacena la lista de doctores e os seus cambios
 const especialidades = ref([])
+const editando = ref(false)
 
 const novoDoctor = reactive({
   iddoc: "",
@@ -130,6 +132,7 @@ const novoDoctor = reactive({
   movildoc: "",
   coledoc: "",
   espedoc: "",
+  lodpac: false,
 });
 
 
@@ -138,12 +141,12 @@ async function guardarDoctor() {
   try {
     if (editando.value) {
       const doctorModificado = await modifyDoctor(
-        novoDoctor.iddoc,
+        novoDoctor._id || novoDoctor.iddoc,
         novoDoctor
       );
 
       const index = doctores.value.findIndex(
-        (d) => d.iddoc === novoDoctor.iddoc
+        (d) => d._id === novoDoctor._id || d.iddoc === novoDoctor.iddoc
       );
 
       if (index !== -1) {
@@ -151,14 +154,14 @@ async function guardarDoctor() {
       }
 
       console.log("Doctor modificado correctamente");
-      await clear();
+      await limpiaFormdoc();
     } else {
       const doctorGuardado = await saveDoctor(novoDoctor);
       doctores.value.push(doctorGuardado);
       
       console.log("Doctor gardado con éxito");
       
-      await clear();
+      await limpiaFormdoc();
       
     }
     
@@ -198,18 +201,79 @@ function corrixirApelido() {
     }
   }
   
-  function validarTelf() {
-    const telfRegex = /^[6|7]\d{8}$/;
-    if (novoDoctor.movildoc != "") {
-      return telfRegex.test(novoDoctor.movildoc.trim());
+function validarTelf() {
+  const telfRegex = /^[6|7]\d{8}$/;
+  if (novoDoctor.movildoc != "") {
+    return telfRegex.test(novoDoctor.movildoc.trim());
   }
+  return true;
 }
 
-async function carregarEspecialidades() {
+function validarDni() {
+  const dniregex = /^[0-9]{8}[A-Z]$/;
+  return dniregex.test(novoDoctor.iddoc.toUpperCase());
+}
+
+function validarDni2() {
+  const dniarray = ['T', 'R', 'W', 'A', 'G', 'M', 'Y', 'F', 'P', 'D', 'X', 'B', 'N', 'J', 'Z', 'S', 'Q', 'V', 'H', 'L', 'C', 'K', 'E'];
+  const numerosDni = novoDoctor.iddoc.slice(0, 8);
+  const letraDni = novoDoctor.iddoc.slice(8, 9);
+  return dniarray[numerosDni % 23] === letraDni.toUpperCase();
+}
+
+async function cargarEspecialidades() {
   especialidades.value = await obtenerEspecialidades()
 }
 
-onMounted(cargarEspecialidades)
+async function cargarDoctores() {
+  try {
+    doctores.value = await getDoctores()
+  } catch (error) {
+    console.error("Erro ao cargar os doctores:", error)
+    doctores.value = []
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([cargarEspecialidades(), cargarDoctores()])
+})
+
+async function buscarDoctor() {
+  const id = novoDoctor.iddoc.trim().toUpperCase();
+  if (!id) return;
+
+  const atopado = doctores.value.find(
+    (d) => String(d.iddoc).toUpperCase() === id
+  );
+
+  if (atopado) {
+    Object.assign(novoDoctor, atopado);
+    editando.value = true;
+  } else {
+    console.log("Doctor non atopado");
+  }
+}
+
+function editarDoctor(index) {
+  const doctor = doctores.value[index];
+  if (!doctor) return;
+
+  Object.assign(novoDoctor, doctor);
+  editando.value = true;
+}
+
+async function eliminarDoctor(index) {
+  const doctor = doctores.value[index];
+  if (!doctor) return;
+
+  try {
+    await deleteDoctor(doctor._id || doctor.iddoc);
+    doctores.value.splice(index, 1);
+    console.log("Doctor eliminado correctamente");
+  } catch (error) {
+    console.error("Erro ao eliminar o doctor:", error);
+  }
+}
 
 const limpiaFormdoc = () => {
   Object.assign(novoDoctor, {
@@ -220,9 +284,10 @@ const limpiaFormdoc = () => {
     movildoc: "",
     coledoc: "",
     espedoc: "",
+    lodpac: false,
   });
-  // editando.value = false;
-  validarTelf.value = false;
+  delete novoDoctor._id;
+  editando.value = false;
 }
 
 </script>
@@ -239,7 +304,8 @@ const limpiaFormdoc = () => {
     width: 100%;
     max-width: 1100px;
     margin: 0 auto;
-    background: white;
+    background: #ffffff;
+    color: #333333;
     padding: clamp(1rem, 3vw, 2rem);
     overflow: hidden;
     box-sizing: border-box;
