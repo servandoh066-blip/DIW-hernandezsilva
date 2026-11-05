@@ -239,7 +239,8 @@ const limpiaFormdoc = () => {
     width: 100%;
     max-width: 1100px;
     margin: 0 auto;
-    background: white;
+    background: #ffffff; /* Corregido: forzado a blanco */
+    color: #333333;      /* Corregido: texto visible */
     padding: clamp(1rem, 3vw, 2rem);
     overflow: hidden;
     box-sizing: border-box;
