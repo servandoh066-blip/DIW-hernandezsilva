@@ -5,11 +5,7 @@
             <div class="fila">
                 <div class="campo campo-id">
                     <label>ID:</label>
-                    <input v-model="novoDoctor.iddoc" v-on:input="novoDoctor.iddoc = novoDoctor.iddoc.toUpperCase()"
-                        type="text" required style="text-align: center;" />
-                </div>
-                <div v-if="novoDoctor.iddoc !== '' && (!validarDni() || !validarDni2())" class="error-message">
-                    <p class="error">O DNI/CIF non é válido</p>
+                    <input v-model.trim="novoDoctor.iddoc" type="text" required style="text-align: center;" />
                 </div>
                 <button type="button" @click="limpiaFormdoc">Limpar</button>
                 <button type="button" @click="buscarDoctor">Buscar</button>
@@ -37,10 +33,12 @@
             <div class="fila">
                 <div class="campo campo-telefono">
                     <label>Telefono:</label>
-                    <input v-model="novoDoctor.movildoc" type="text" required />
-                </div>
-                <div v-if="novoDoctor.movildoc !== '' && (!validarTelf())" class="error-message">
-                    <p class="error">O teléfono non é válido</p>
+                    <div class="input-wrap">
+                        <input v-model.trim="novoDoctor.movildoc" type="text" required />
+                        <span v-if="novoDoctor.movildoc !== '' && !validarTelf()" class="error-inline">
+                            O teléfono non é válido
+                        </span>
+                    </div>
                 </div>
                 <div class="campo campo-especialidad">
                     <label>Especialidad:</label>
@@ -54,7 +52,7 @@
             </div>
             <div class="campo-condicions">
                 <label>
-                    <input v-model="novoDoctor.lodpac" type="checkbox" /> Aceptar a
+                    <input v-model="novoDoctor.lodpac" type="checkbox" required /> Aceptar a
                     <a :href="$router.resolve({ name: 'PoliticaPrivacidad' }).href" target="_blank"
                         rel="noopener noreferrer">
                         Política de privacidade e confidencialidade
@@ -66,43 +64,46 @@
                 class="btn-guardar" 
                 :disabled="novoDoctor.nomedoc === '' ||
                     novoDoctor.apeldoc === '' ||
-                    !novoDoctor.espedoc
+                    !novoDoctor.espedoc ||
+                    !novoDoctor.lodpac
                 ">
-                Gardar
+                {{ editando ? 'Actualizar' : 'Gardar' }}
             </button>
         </form>
         <h4>📋 Listaxe de doctores</h4>
-        <table v-if="doctores.length > 0">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>ID</th>
-                    <th>Apelidos</th>
-                    <th>Nome</th>
-                    <th>Móvil</th>
-                    <th>Especialidad</th>
-                    <th>Accións</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="(u, index) in doctores" :key="u._id || u.iddoc">
-                    <td style="text-align: center;">{{ index + 1 }}</td>
-                    <td style="text-align: center;">{{ u.iddoc }}</td>
-                    <td>{{ u.apeldoc }}</td>
-                    <td>{{ u.nomedoc }}</td>
-                    <td>{{ u.movildoc }}</td>
-                    <td style="text-align: center;">{{ u.espedoc }}</td>
-                    <td style="text-align: center;">
-                        <button @click="editarDoctor(index)" title="Editar">
-                            ✏️
-                        </button>
-                        <button @click="eliminarDoctor(index)" title="Eliminar">
-                            🗑️
-                        </button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div v-if="doctores.length > 0" class="taboa-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>ID</th>
+                        <th>Apelidos</th>
+                        <th>Nome</th>
+                        <th>Móvil</th>
+                        <th>Especialidad</th>
+                        <th>Accións</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(u, index) in doctores" :key="u._id || u.iddoc">
+                        <td style="text-align: center;">{{ index + 1 }}</td>
+                        <td style="text-align: center;">{{ u.iddoc }}</td>
+                        <td>{{ u.apeldoc }}</td>
+                        <td>{{ u.nomedoc }}</td>
+                        <td>{{ u.movildoc }}</td>
+                        <td style="text-align: center;">{{ u.espedoc }}</td>
+                        <td style="text-align: center;">
+                            <button @click="editarDoctor(index)" title="Editar">
+                                ✏️
+                            </button>
+                            <button @click="eliminarDoctor(index)" title="Eliminar">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <p v-else>Non hai doctores cargados.</p>
     </div>
@@ -114,10 +115,10 @@
     import {
         saveDoctor,
         getDoctores,
-        getDoctorByEspecialidad,
         modifyDoctor,
         deleteDoctor
     } from "../api/doctores.js"
+    import { alertaConfirmacion, alertaExito, alertaError, alertaInfo } from "../utils/alertas.js"
     
     
 const doctores = ref([])  //almacena la lista de doctores e os seus cambios
@@ -138,46 +139,53 @@ const novoDoctor = reactive({
 
 
 async function guardarDoctor() {
+  // Non se pode gardar nin modificar sen aceptar as condicións
+  if (!novoDoctor.lodpac) {
+    alertaInfo("Debes aceptar a política de privacidade e confidencialidade");
+    return;
+  }
+
   try {
+    // Os datos que se envían ao backend non deben levar _id nin __v
+    const { _id, __v, ...datos } = novoDoctor;
+
     if (editando.value) {
+      // Ao editar usamos o _id de MongoDB (ou o iddoc como alternativa)
       const doctorModificado = await modifyDoctor(
-        novoDoctor._id || novoDoctor.iddoc,
-        novoDoctor
+        _id || datos.iddoc,
+        datos
       );
 
       const index = doctores.value.findIndex(
-        (d) => d._id === novoDoctor._id || d.iddoc === novoDoctor.iddoc
+        (d) => (_id && d._id === _id) || d.iddoc === datos.iddoc
       );
 
       if (index !== -1) {
-        doctores.value[index] = doctorModificado;
+        // Substituímos o doctor da lista polo que devolve o servidor
+        Object.assign(doctores.value[index], doctorModificado);
       }
 
-      console.log("Doctor modificado correctamente");
+      await alertaExito("Doctor modificado con éxito");
       await limpiaFormdoc();
     } else {
-      const doctorGuardado = await saveDoctor(novoDoctor);
+      const doctorGuardado = await saveDoctor(datos);
       doctores.value.push(doctorGuardado);
-      
-      console.log("Doctor gardado con éxito");
-      
-      await limpiaFormdoc();
-      
-    }
-    
-    editando.value = false;
+      ordearDoctores();
 
-    /*
-    const pacienteGuardado = await savePaciente(novoPaciente);
-    pacientes.value.push(pacienteGuardado);
-    console.log("Paciente gardado correctamente");
-    getPacientes();
-    Object.assign(novoPaciente, { dnipac: "", nomepac: "", apelpac: "", mailpac: "", propac: "", munipac: "", movilpac: "", dirpac: "", nacipac: "" })
-    cargarMunicipios(); // Reinicia a lista de municipios ao gardar un paciente
-    */
+      await alertaExito("Doctor gardado con éxito");
+      await limpiaFormdoc();
+    }
   } catch (error) {
     console.error("Erro ao gardar o doctor:", error);
+    alertaError("Erro ao gardar o doctor. Contacte co administrador.");
   }
+}
+
+// Mantén a listaxe ordenada por apelido, igual que getDoctores()
+function ordearDoctores() {
+  doctores.value.sort((a, b) =>
+    String(a.apeldoc).localeCompare(String(b.apeldoc), "es", { sensitivity: "base" })
+  );
 }
 
 // Funciones auxiliares
@@ -209,18 +217,6 @@ function validarTelf() {
   return true;
 }
 
-function validarDni() {
-  const dniregex = /^[0-9]{8}[A-Z]$/;
-  return dniregex.test(novoDoctor.iddoc.toUpperCase());
-}
-
-function validarDni2() {
-  const dniarray = ['T', 'R', 'W', 'A', 'G', 'M', 'Y', 'F', 'P', 'D', 'X', 'B', 'N', 'J', 'Z', 'S', 'Q', 'V', 'H', 'L', 'C', 'K', 'E'];
-  const numerosDni = novoDoctor.iddoc.slice(0, 8);
-  const letraDni = novoDoctor.iddoc.slice(8, 9);
-  return dniarray[numerosDni % 23] === letraDni.toUpperCase();
-}
-
 async function cargarEspecialidades() {
   especialidades.value = await obtenerEspecialidades()
 }
@@ -239,18 +235,18 @@ onMounted(async () => {
 })
 
 async function buscarDoctor() {
-  const id = novoDoctor.iddoc.trim().toUpperCase();
+  const id = novoDoctor.iddoc.trim();
   if (!id) return;
 
   const atopado = doctores.value.find(
-    (d) => String(d.iddoc).toUpperCase() === id
+    (d) => String(d.iddoc).toLowerCase() === id.toLowerCase()
   );
 
   if (atopado) {
     Object.assign(novoDoctor, atopado);
     editando.value = true;
   } else {
-    console.log("Doctor non atopado");
+    alertaInfo("Non existe ningún doctor con ese ID");
   }
 }
 
@@ -267,11 +263,17 @@ async function eliminarDoctor(index) {
   if (!doctor) return;
 
   try {
+    const confirmacion = await alertaConfirmacion(
+      "¿Estás seguro de eliminar este doctor?"
+    );
+    if (!confirmacion.isConfirmed) return;
+
     await deleteDoctor(doctor._id || doctor.iddoc);
     doctores.value.splice(index, 1);
-    console.log("Doctor eliminado correctamente");
+    alertaExito("Doctor eliminado con éxito");
   } catch (error) {
     console.error("Erro ao eliminar o doctor:", error);
+    alertaError("Erro ao eliminar o doctor. Contacte co administrador.");
   }
 }
 
@@ -287,6 +289,7 @@ const limpiaFormdoc = () => {
     lodpac: false,
   });
   delete novoDoctor._id;
+  delete novoDoctor.__v;
   editando.value = false;
 }
 
@@ -334,11 +337,10 @@ form {
 .campo {
     display: flex;
     flex: 1 1 220px;
-    min-width: min(100%, 220px);
+    min-width: 0;
     flex-direction: row;
     align-items: stretch;
     gap: 0.35rem;
-    min-width: 0;
 }
 
 .campo label {
@@ -368,9 +370,25 @@ form {
     border-color: #057559;
 }
 
-.fila > .error-message {
-    flex: 1 1 100%;
-    margin: 0;
+/* O aviso do teléfono colócase fóra do fluxo para que o campo
+   non cambie de tamaño nin de posición ao recibir o foco. */
+.input-wrap {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+}
+
+.error-inline {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 0.15rem;
+    color: #dc2626;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    pointer-events: none;
 }
 
 .fila > button:not(.btn-guardar) {
@@ -426,12 +444,16 @@ form {
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 1rem;
     font-size: 0.8rem;
     border: 1px solid #ddd;
-    display: block;
+}
+
+/* O wrapper ocupa todo o ancho da sección e permíte scroll horizontal
+   en pantallas pequenas sen romper o ancho da táboa. */
+.taboa-wrapper {
+    width: 100%;
+    margin-top: 1rem;
     overflow-x: auto;
-    white-space: nowrap;
 }
 
 th,
@@ -439,6 +461,7 @@ td {
     border: 1px solid #ddd;
     padding: 0.7rem;
     text-align: left;
+    white-space: nowrap;
 }
 
 th {

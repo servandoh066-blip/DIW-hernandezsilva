@@ -192,46 +192,42 @@ async function clear() {
 
 async function guardarPaciente() {
   if (!validarDni() || !validarDni2()) {
+    alertaError("O DNI/CIF non é válido");
     return;
   } else if (!validarTelf()) {
+    alertaError("O teléfono non é válido");
     return;
   }
+  
   try {
+    const respuesta = await alertaConfirmacion(
+      editando.value ? "¿Estás seguro de modificar este paciente?" : "¿Estás seguro de gardar este paciente?"
+    );
+
+    if (!respuesta.isConfirmed) return;
+
+    // Eliminamos _id e __v antes de enviar ao backend
+    const { _id, __v, ...datos } = novoPaciente;
+
     if (editando.value) {
-      const respuesta = await alertaConfirmacion("¿Estás seguro de modificar este paciente?");
-      if (respuesta.isConfirmed) {
-      const pacienteModificado = await modifyPaciente(
-        novoPaciente.dnipac,
-        novoPaciente
-      );
+      const pacienteModificado = await modifyPaciente(datos.dnipac, datos);
 
-      const index = pacientes.value.findIndex(
-        (p) => p.dnipac === novoPaciente.dnipac
-      );
-
+      const index = pacientes.value.findIndex((p) => p.dnipac === datos.dnipac);
       if (index !== -1) {
         pacientes.value[index] = pacienteModificado;
       }
       alertaExito("Paciente modificado con éxito");
-      await clear();
-      } else {
-        return;
-      }
     } else {
-      const respuesta = await alertaConfirmacion("¿Estás seguro de gardar este paciente?");
-      if(respuesta.isConfirmed) {
-      const pacienteGuardado = await savePaciente(novoPaciente);
+      const pacienteGuardado = await savePaciente(datos);
       pacientes.value.push(pacienteGuardado);
       alertaExito("Paciente gardado con éxito");
-      await clear();
-    }else { 
-      return;
     }
-  }
+
+    await clear();
     editando.value = false;
   } catch (error) {
     console.error("Erro ao gardar o paciente:", error);
-    alertaError("Erro ao gardar o paciente. Contacte con el administrador.");
+    alertaError("Erro ao gardar o paciente. Contacte co administrador.");
   }
 }
 
