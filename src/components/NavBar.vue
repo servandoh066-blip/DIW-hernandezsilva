@@ -8,6 +8,7 @@
     <!-- MODIFICADO -->
     <ul :class="['menu', { open: isOpen }]">
       <li><RouterLink to="/">Inicio</RouterLink></li>
+      <li><RouterLink to="/servicios">Servicios</RouterLink></li>
       <li><RouterLink to="/xestionpacientes">Pacientes</RouterLink></li>
       <li><RouterLink to="/xestion-doctores">Doctores</RouterLink></li>
       <li><RouterLink to="/xestion-citas">Citas</RouterLink></li>

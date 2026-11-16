@@ -31,8 +31,10 @@
         </div>
         <div class="campo campo-correo">
           <label>Correo:</label>
-          <input v-model="novoPaciente.mailpac" type="email" required />
+          <input v-model="novoPaciente.mailpac" type="email" required
+            :class="{ 'campo-invalido': correoInvalido }" />
         </div>
+        <p v-if="correoInvalido" class="error">O correo non é válido</p>
         <div class="campo campo-dirección">
           <label>Dirección:</label>
           <input v-model="novoPaciente.dirpac" type="text" required />
@@ -41,7 +43,9 @@
       <div class="fila">
         <div class="campo campo-telefono">
           <label>Telefono:</label>
-          <input v-model="novoPaciente.movilpac" type="text" required />
+          <input v-model="novoPaciente.movilpac" type="tel" inputmode="numeric" required
+            style="text-align: center;" :class="{ 'campo-invalido': movilInvalido }"
+            @input="validarMovilEnEntrada" />
         </div>
         <div v-if="novoPaciente.movilpac !== '' && (!validarTelf())" class="error-message">
           <p class="error">O teléfono non é válido</p>
@@ -57,7 +61,7 @@
         </div>
         <div class="campo campo-municipio">
           <label>Municipio:</label>
-          <select id="municipio" v-model="novoPaciente.munipac" required>
+          <select id="municipio" v-model="novoPaciente.munipac" required :disabled="!novoPaciente.propac">
             <option value="">Selecciona un municipio</option>
             <option v-for="municipio in municipios" :key="municipio.id" :value="municipio.nm">
               {{ municipio.nm }}
@@ -83,7 +87,18 @@
         Gardar
       </button>
     </form>
-    <h4>📋 Listaxe de pacientes</h4>
+    <div class="cabecera-listaxe">
+      <h4>📋 Listaxe de pacientes</h4>
+      <button
+        type="button"
+        class="btn-pdf"
+        :disabled="pacientes.length === 0"
+        title="Exportar a PDF"
+        @click="exportarPdf"
+      >
+        📄 Exportar PDF
+      </button>
+    </div>
     <table v-if="pacientes.length > 0">
       <thead>
         <tr>
@@ -118,7 +133,7 @@
 
 <script setup>
 /// Zona de declaracións
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { obtenerMunicipios, obtenerProvincias } from "../api/municipios.js"
 import {
   savePaciente,
@@ -128,12 +143,35 @@ import {
   getPacienteByDni
 } from "../api/pacientes.js"
 import { alertaConfirmacion, alertaExito, alertaError } from "../utils/alertas.js"
+import { exportarPacientes } from "../utils/pdf.js"
+
+// Descarga a listaxe de pacientes en PDF
+function exportarPdf() {
+  try {
+    exportarPacientes(pacientes.value)
+  } catch (erro) {
+    console.error("Erro ao xerar o PDF:", erro)
+    alertaError("Non se puido xerar o PDF")
+  }
+}
+import { usepacienteStore } from '../store/pacienteStore.js'
 
 const provincias = ref([])
 const municipios = ref([])
 
 const pacientes = ref([])  //almacena la lista de paciente e os seus cambios
 const editando = ref(false);
+
+// Validacións en tempo real (avísanse mentres se escribe)
+const movilInvalido = computed(() => {
+  const valor = novoPaciente.movilpac.trim();
+  return valor !== "" && !validarTelf();
+});
+
+const correoInvalido = computed(() => {
+  const valor = novoPaciente.mailpac.trim();
+  return valor !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
+});
 
 const novoPaciente = reactive({
   dnipac: "",
@@ -155,7 +193,24 @@ const novoPaciente = reactive({
 onMounted(async () => {
   provincias.value = await obtenerProvincias();
   pacientes.value = await getPacientes(); //carga os pacientes desde o backend
+  ordenarPacientes();
 })
+
+// Mantén a listaxe ordenada por apelidos e nome (igual que o listado de doctores)
+function ordenarPacientes() {
+  pacientes.value.sort((a, b) => {
+    const apelidosA = String(a.apelpac || "").trim();
+    const apelidosB = String(b.apelpac || "").trim();
+    const comparacion = apelidosA.localeCompare(apelidosB, "es", { sensitivity: "base" });
+    if (comparacion !== 0) return comparacion;
+    return String(a.nomepac || "").localeCompare(String(b.nomepac || ""), "es", { sensitivity: "base" });
+  });
+}
+
+function seleccionarPaciente(paciente){
+  const pacienteStore = usepacienteStore();
+  pacienteStore.seleccionarPaciente(paciente);
+}
 
 async function cargarMunicipios() {
   if (novoPaciente.propac === "") {
@@ -217,12 +272,15 @@ async function guardarPaciente() {
         pacientes.value[index] = pacienteModificado;
       }
       alertaExito("Paciente modificado con éxito");
+      seleccionarPaciente(pacienteModificado);
     } else {
       const pacienteGuardado = await savePaciente(datos);
       pacientes.value.push(pacienteGuardado);
       alertaExito("Paciente gardado con éxito");
+      seleccionarPaciente(pacienteGuardado);
     }
 
+    ordenarPacientes();
     await clear();
     editando.value = false;
   } catch (error) {
@@ -268,11 +326,27 @@ function gardarPaciente() {
 async function editarUsuario(index) {
   const paciente = pacientes.value[index];   //carga os datos do paciente elixido no formulario
   Object.assign(novoPaciente, paciente);  // carga os datos do paciente no formulario recorda v-model do formulario é novoPaciente
+  // Formateamos a data para que o input type="date" a poida amosar
+  novoPaciente.nacipac = formatearFechaParaInput(paciente.nacipac);
   //evitar que se cargue el _id de mongoDB en el formulario
   delete novoPaciente._id;
   editando.value = true;
+  seleccionarPaciente(novoPaciente);
   //cargar los municipios
   await cargarMunicipios();
+}
+
+// Mongo garda a data como ISO (con hora), e o input type="date" só acepta AAAA-MM-DD
+function formatearFechaParaInput(fecha) {
+  if (!fecha) return "";
+
+  if (typeof fecha === "string") return fecha.slice(0, 10);
+
+  if (fecha instanceof Date && !Number.isNaN(fecha.getTime())) {
+    return fecha.toISOString().slice(0, 10);
+  }
+
+  return "";
 }
 
 async function buscarPaciente() {
@@ -287,6 +361,8 @@ async function buscarPaciente() {
     const paciente = await getPacienteByDni(dni);
 
     Object.assign(novoPaciente, paciente);
+    novoPaciente.nacipac = formatearFechaParaInput(paciente.nacipac);
+    seleccionarPaciente(paciente);
     await cargarMunicipios();
 
     console.log("Paciente encontrado:", paciente);
@@ -303,16 +379,38 @@ async function buscarPaciente() {
 //===================================================================================
 // Funciones auxiliares
 
+// Letras de control do DNI/NIE
+const letrasDni = "TRWAGMYFPDXBNJZSQVHLCKE";
+
+// Valida o formato: DNI (8 díxitos + letra), NIE (X/Y/Z + 7 díxitos + letra)
+// e CIF (letra + 7 díxitos + control)
 function validarDni() {
-  const dniregex = /^[0-9]{8}[A-Z]$/; // Expresión regular para validar el formato del DNI
-  return dniregex.test(novoPaciente.dnipac.toUpperCase());
+  const valor = String(novoPaciente.dnipac || "").trim().toUpperCase();
+
+  if (/^[0-9]{8}[A-Z]$/.test(valor)) return true;      // DNI
+  if (/^[XYZ][0-9]{7}[A-Z]$/.test(valor)) return true; // NIE
+  return /^[A-HJ-NP-SUVW][0-9]{7}[0-9A-J]$/.test(valor); // CIF
 }
 
 function validarDni2() {
-  const dniarray = ['T', 'R', 'W', 'A', 'G', 'M', 'Y', 'F', 'P', 'D', 'X', 'B', 'N', 'J', 'Z', 'S', 'Q', 'V', 'H', 'L', 'C', 'K', 'E'];
-  const numerosDni = novoPaciente.dnipac.slice(0, 8);
-  const letraDni = novoPaciente.dnipac.slice(8, 9);
-  return dniarray[numerosDni % 23] === letraDni.toUpperCase();
+  const valor = String(novoPaciente.dnipac || "").trim().toUpperCase();
+
+  // No CIF o díxito de control pode ser número ou letra: valídase o formato
+  if (/^[A-HJ-NP-SUVW][0-9]{7}[0-9A-J]$/.test(valor)) return true;
+
+  let numerosDni;
+
+  if (/^[0-9]{8}[A-Z]$/.test(valor)) {
+    numerosDni = Number.parseInt(valor.slice(0, 8), 10); // DNI
+  } else if (/^[XYZ][0-9]{7}[A-Z]$/.test(valor)) {
+    // NIE: a inicial equivalente a 0 (X), 1 (Y) ou 2 (Z)
+    const normalizado = valor.slice(0, 8).replace("X", "0").replace("Y", "1").replace("Z", "2");
+    numerosDni = Number.parseInt(normalizado, 10);
+  } else {
+    return false;
+  }
+
+  return letrasDni[numerosDni % 23] === valor[8];
 }
 
 function corrixirNome() {
@@ -336,10 +434,15 @@ function corrixirApelido() {
   }
   
   function validarTelf() {
-    const telfRegex = /^[6|7]\d{8}$/;
+    const telfRegex = /^[67]\d{8}$/;
     if (novoPaciente.movilpac != "") {
       return telfRegex.test(novoPaciente.movilpac.trim());
   }
+}
+
+// Deixa escribir só díxitos no campo do teléfono
+function validarMovilEnEntrada() {
+  novoPaciente.movilpac = novoPaciente.movilpac.replace(/\D/g, "");
 }
 
 const limpiaFormpac = () => {
@@ -476,6 +579,13 @@ form {
   color: #333;
 }
 
+/* Campo marcado como inválido polas validacións en tempo real */
+.campo input.campo-invalido,
+.campo-invalido {
+  border: 2px solid #dc3545 !important;
+  box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.15);
+}
+
 .fila > button:not(.btn-guardar) {
   align-self: center;
   padding: 0.5rem;
@@ -580,5 +690,30 @@ h4 {
   .fila > button:not(.btn-guardar) {
     width: 100%;
   }
+}
+.cabecera-listaxe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.btn-pdf {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid #d7ebe3;
+  border-radius: 8px;
+  background-color: #e8f7f1;
+  color: #173b2b;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-pdf:hover:not(:disabled) {
+  background-color: #d1f0e3;
+}
+
+.btn-pdf:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 </style>

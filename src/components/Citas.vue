@@ -112,21 +112,45 @@
         </div>
       </div>
 
-      <button type="submit" class="btn-gardar">Gardar</button>
+      <div class="botons-formulario">
+        <button type="submit" class="btn-gardar">
+          {{ editandoId ? "Actualizar" : "Gardar" }}
+        </button>
+        <button
+          v-if="editandoId"
+          type="button"
+          class="btn-cancelar"
+          @click="limparFormulario"
+        >
+          Cancelar
+        </button>
+      </div>
     </form>
 
     <section class="listaxe">
       <header class="cabecera-listaxe">
         <h2>📑 Listaxe de Citas</h2>
-        <button
-          type="button"
-          class="btn-recargar"
-          title="Recargar listado"
-          aria-label="Recargar listado"
-          @click="cargarCitas"
-        >
-          ↻
-        </button>
+        <div class="accions-listaxe">
+          <button
+            type="button"
+            class="btn-pdf"
+            :disabled="citas.length === 0"
+            title="Exportar a PDF"
+            aria-label="Exportar a PDF"
+            @click="exportarPdf"
+          >
+            📄 PDF
+          </button>
+          <button
+            type="button"
+            class="btn-recargar"
+            title="Recargar listado"
+            aria-label="Recargar listado"
+            @click="cargarCitas"
+          >
+            ↻
+          </button>
+        </div>
       </header>
 
       <p v-if="citas.length === 0" class="estado-vacio">
@@ -145,22 +169,43 @@
               <th>Motivo</th>
               <th>Estado</th>
               <th>Observacións</th>
+              <th>Accións</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(item, index) in citas" :key="item.idcita || index">
-              <td>{{ item.idcita }}</td>
+            <tr v-for="(item, index) in citas" :key="item._id || index">
+              <td>{{ item.idcita || item._id }}</td>
               <td>{{ formatarData(item.fecha) }}</td>
               <td>{{ item.hora }}</td>
-              <td>{{ item.idpaciente }}</td>
-              <td>{{ item.iddoctor }}</td>
+              <td>{{ idPacienteDe(item) || "—" }}</td>
+              <td>{{ idDoctorDe(item) || "—" }}</td>
               <td>{{ item.motivo }}</td>
               <td>
-                <span :class="['estado', `estado-${item.estado.toLowerCase()}`]">
+                <span :class="['estado', `estado-${String(item.estado || '').toLowerCase()}`]">
                   {{ item.estado }}
                 </span>
               </td>
               <td>{{ item.observacions || "—" }}</td>
+              <td class="cela-accions">
+                <button
+                  type="button"
+                  class="btn-accion"
+                  title="Editar"
+                  aria-label="Editar cita"
+                  @click="editarCita(item)"
+                >
+                  ✏️
+                </button>
+                <button
+                  type="button"
+                  class="btn-accion"
+                  title="Eliminar"
+                  aria-label="Eliminar cita"
+                  @click="eliminarCita(item)"
+                >
+                  🗑️
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -171,8 +216,14 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-
-const API_URL = "http://localhost:3000/api/citas";
+import { usepacienteStore } from "../store/pacienteStore";
+import { getCitas, saveCita, modifyCita, deleteCita } from "../api/citas.js";
+import {
+  alertaExito,
+  alertaError,
+  alertaConfirmacion,
+} from "../utils/alertas.js";
+import { exportarCitas } from "../utils/pdf.js";
 
 // Obxecto reactivo enlazado ao formulario mediante v-model
 const cita = ref({
@@ -188,30 +239,91 @@ const cita = ref({
 
 // Listaxe de citas amosada na parte inferior
 const citas = ref([]);
+// _id da cita que se está a editar, ou null se é unha alta
+const editandoId = ref(null);
+const pacienteStore = usepacienteStore();
 
 // Se o backend aínda non está dispoñible, mantense a listaxe actual
 // e amósase a mensaxe de estado vacío.
 async function cargarCitas() {
   try {
-    const resposta = await fetch(API_URL);
-
-    if (!resposta.ok) {
-      throw new Error(`HTTP ${resposta.status}`);
-    }
-
-    const datos = await resposta.json();
+    const datos = await getCitas();
     citas.value = Array.isArray(datos) ? datos : [];
+    ordenarCitas();
   } catch (erro) {
     console.warn("Non se puideron cargar as citas:", erro);
   }
 }
 
-function gardarCita() {
-  citas.value.push({ ...cita.value });
-  limparFormulario();
+// Garda a cita no backend (ou actualiza a que se está a editar)
+async function gardarCita() {
+  try {
+    const datos = { ...cita.value };
+
+    if (editandoId.value) {
+      const actualizada = await modifyCita(editandoId.value, datos);
+      const index = citas.value.findIndex(
+        (item) => item._id === editandoId.value,
+      );
+      if (index !== -1) {
+        citas.value[index] = actualizada;
+      }
+      alertaExito("Cita actualizada con éxito");
+    } else {
+      const nova = await saveCita(datos);
+      citas.value.push(nova);
+      alertaExito("Cita gardada con éxito");
+    }
+
+    ordenarCitas();
+    limparFormulario();
+  } catch (erro) {
+    console.error("Erro ao gardar a cita:", erro);
+    alertaError(erro?.response?.data?.message || "Non se puido gardar a cita");
+  }
+}
+
+// Carga a cita no formulario para modificala
+function editarCita(item) {
+  editandoId.value = item._id;
+  Object.assign(cita.value, {
+    idcita: item.idcita || "",
+    fecha: fechaParaInput(item.fecha),
+    idpaciente: idPacienteDe(item),
+    iddoctor: idDoctorDe(item),
+    hora: item.hora || "",
+    motivo: item.motivo || "",
+    estado: item.estado || "Pendente",
+    observacions: item.observacions || "",
+  });
+}
+
+// Pide confirmación e elimina a cita do backend
+async function eliminarCita(item) {
+  const confirmacion = await alertaConfirmacion(
+    "Esta acción non ten volta atrás",
+    "¿Seguro que queres eliminar esta cita?",
+  );
+
+  if (!confirmacion.isConfirmed) return;
+
+  try {
+    await deleteCita(item._id);
+    citas.value = citas.value.filter((citaItem) => citaItem._id !== item._id);
+
+    if (editandoId.value === item._id) {
+      limparFormulario();
+    }
+
+    alertaExito("Cita eliminada con éxito");
+  } catch (erro) {
+    console.error("Erro ao eliminar a cita:", erro);
+    alertaError(erro?.response?.data?.message || "Non se puido eliminar a cita");
+  }
 }
 
 function limparFormulario() {
+  editandoId.value = null;
   Object.assign(cita.value, {
     idcita: "",
     fecha: "",
@@ -224,14 +336,66 @@ function limparFormulario() {
   });
 }
 
+// Mantén a listaxe ordenada por data e hora, igual que a devolve o backend
+function ordenarCitas() {
+  citas.value.sort((a, b) => {
+    const porFecha = String(a.fecha || "").localeCompare(String(b.fecha || ""));
+    if (porFecha !== 0) return porFecha;
+    return String(a.hora || "").localeCompare(String(b.hora || ""));
+  });
+}
+
+// As referencias veñen xa resoltas co populate; senón, devólvese o id cru
+function idPacienteDe(item) {
+  const referencia = item.pacienteId;
+  if (referencia && typeof referencia === "object") {
+    return referencia.dnipac || "";
+  }
+  return referencia || "";
+}
+
+function idDoctorDe(item) {
+  const referencia = item.doctorId;
+  if (referencia && typeof referencia === "object") {
+    return referencia.iddoc || "";
+  }
+  return referencia || "";
+}
+
+// Mongo pode gardar a data como ISO con hora; o input type="date" só acepta AAAA-MM-DD
+function fechaParaInput(fecha) {
+  if (!fecha) return "";
+
+  if (typeof fecha === "string") return fecha.slice(0, 10);
+
+  if (fecha instanceof Date && !Number.isNaN(fecha.getTime())) {
+    return fecha.toISOString().slice(0, 10);
+  }
+
+  return "";
+}
+
 function formatarData(data) {
   if (!data) return "";
 
-  const [ano, mes, dia] = data.split("-");
+  const [ano, mes, dia] = String(data).slice(0, 10).split("-");
   return `${dia}/${mes}/${ano}`;
 }
 
-onMounted(cargarCitas);
+// Descarga a listaxe actual en PDF
+async function exportarPdf() {
+  try {
+    exportarCitas(citas.value);
+  } catch (erro) {
+    console.error("Erro ao xerar o PDF:", erro);
+    alertaError("Non se puido xerar o PDF");
+  }
+}
+
+onMounted(async () => {
+  await cargarCitas();
+  cita.value.idpaciente = pacienteStore.dnipac || "";
+});
 </script>
 
 <style scoped>
@@ -362,6 +526,28 @@ onMounted(cargarCitas);
   background-color: #129662;
 }
 
+.botons-formulario {
+  display: flex;
+  align-self: center;
+  margin-top: 0.25rem;
+  gap: 0.75rem;
+}
+
+.btn-cancelar {
+  padding: 0.7rem 2.25rem;
+  border: 1px solid #cfd8d3;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #333333;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-cancelar:hover {
+  background-color: #e8f7f1;
+}
+
 .listaxe {
   border: 1px solid #d7ebe3;
   border-radius: 10px;
@@ -400,6 +586,48 @@ onMounted(cargarCitas);
 
 .btn-recargar:hover {
   background-color: rgba(255, 255, 255, 0.32);
+}
+
+.accions-listaxe {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-pdf {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-pdf:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.32);
+}
+
+.btn-pdf:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.cela-accions {
+  white-space: nowrap;
+}
+
+.btn-accion {
+  margin: 0 0.15rem;
+  padding: 0.2rem 0.35rem;
+  border: none;
+  border-radius: 6px;
+  background-color: transparent;
+  cursor: pointer;
+}
+
+.btn-accion:hover {
+  background-color: #e8f7f1;
 }
 
 .estado-vacio {

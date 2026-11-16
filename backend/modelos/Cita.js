@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 const CitaSchema = new mongoose.Schema(
     {
+        idcita: { type: String, default: "" },
         pacienteId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Paciente",

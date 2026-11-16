@@ -12,8 +12,7 @@
 import { ref, reactive, computed } from 'vue'
 
 const contador = ref(0);
-const paciente = reactive
-({
+const paciente = reactive({
   nombre: 'Xosé',
   puntuacion: 0
 })

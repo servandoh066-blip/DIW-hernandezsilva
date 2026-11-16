@@ -21,20 +21,30 @@
                 </div>
             </div>
             <div class="fila">
-                <div class="campo campo-data-nacimiento">
-                    <label>Data de nacemento:</label>
-                    <input v-model="novoDoctor.coledoc" type="date" required />
+                <div class="campo campo-colegiado">
+                    <label>Colegiado:</label>
+                    <label class="opcion-radio">
+                        <input v-model="novoDoctor.coledoc" type="radio" value="Si" name="colegiado" required />
+                        Si
+                    </label>
+                    <label class="opcion-radio">
+                        <input v-model="novoDoctor.coledoc" type="radio" value="Non" name="colegiado" required />
+                        Non
+                    </label>
                 </div>
                 <div class="campo campo-correo">
                     <label>Correo:</label>
-                    <input v-model="novoDoctor.maildoc" type="email" required />
+                    <input v-model="novoDoctor.maildoc" type="email" required
+                        :class="{ 'campo-invalido': correoInvalido }" />
+                    <span v-if="correoInvalido" class="error-inline">O correo non é válido</span>
                 </div>
             </div>
             <div class="fila">
                 <div class="campo campo-telefono">
                     <label>Telefono:</label>
                     <div class="input-wrap">
-                        <input v-model.trim="novoDoctor.movildoc" type="text" required />
+                        <input v-model.trim="novoDoctor.movildoc" type="tel" inputmode="numeric" required
+                            :class="{ 'campo-invalido': movilInvalido }" @input="validarMovilEnEntrada" />
                         <span v-if="novoDoctor.movildoc !== '' && !validarTelf()" class="error-inline">
                             O teléfono non é válido
                         </span>
@@ -52,7 +62,7 @@
             </div>
             <div class="campo-condicions">
                 <label>
-                    <input v-model="novoDoctor.lodpac" type="checkbox" required /> Aceptar a
+                    <input v-model="novoDoctor.loddoc" type="checkbox" required /> Aceptar a
                     <a :href="$router.resolve({ name: 'PoliticaPrivacidad' }).href" target="_blank"
                         rel="noopener noreferrer">
                         Política de privacidade e confidencialidade
@@ -65,12 +75,23 @@
                 :disabled="novoDoctor.nomedoc === '' ||
                     novoDoctor.apeldoc === '' ||
                     !novoDoctor.espedoc ||
-                    !novoDoctor.lodpac
+                    !novoDoctor.loddoc
                 ">
                 {{ editando ? 'Actualizar' : 'Gardar' }}
             </button>
         </form>
-        <h4>📋 Listaxe de doctores</h4>
+        <div class="cabecera-listaxe">
+            <h4>📋 Listaxe de doctores</h4>
+            <button
+                type="button"
+                class="btn-pdf"
+                :disabled="doctores.length === 0"
+                title="Exportar a PDF"
+                @click="exportarPdf"
+            >
+                📄 Exportar PDF
+            </button>
+        </div>
         <div v-if="doctores.length > 0" class="taboa-wrapper">
             <table>
                 <thead>
@@ -110,7 +131,7 @@
 </template>
 
 <script setup>
-    import { ref, reactive, onMounted } from 'vue'
+    import { ref, reactive, onMounted, computed } from 'vue'
     import { obtenerEspecialidades } from "../api/especialidades.js"
     import {
         saveDoctor,
@@ -119,11 +140,35 @@
         deleteDoctor
     } from "../api/doctores.js"
     import { alertaConfirmacion, alertaExito, alertaError, alertaInfo } from "../utils/alertas.js"
+    import { exportarDoctores } from "../utils/pdf.js"
+
+    // Descarga a listaxe de doctores en PDF
+    function exportarPdf() {
+        try {
+            exportarDoctores(doctores.value)
+        } catch (erro) {
+            console.error("Erro ao xerar o PDF:", erro)
+            alertaError("Non se puido xerar o PDF")
+        }
+    }
+    import { usedoctorStore } from "../store/doctorStore.js"
     
     
 const doctores = ref([])  //almacena la lista de doctores e os seus cambios
 const especialidades = ref([])
 const editando = ref(false)
+const doctorStore = usedoctorStore()
+
+// Validacións en tempo real (avísanse mentres se escribe)
+const movilInvalido = computed(() => {
+  const valor = novoDoctor.movildoc.trim();
+  return valor !== "" && !validarTelf();
+});
+
+const correoInvalido = computed(() => {
+  const valor = novoDoctor.maildoc.trim();
+  return valor !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
+});
 
 const novoDoctor = reactive({
   iddoc: "",
@@ -133,14 +178,14 @@ const novoDoctor = reactive({
   movildoc: "",
   coledoc: "",
   espedoc: "",
-  lodpac: false,
+  loddoc: false,
 });
 
 
 
 async function guardarDoctor() {
   // Non se pode gardar nin modificar sen aceptar as condicións
-  if (!novoDoctor.lodpac) {
+  if (!novoDoctor.loddoc) {
     alertaInfo("Debes aceptar a política de privacidade e confidencialidade");
     return;
   }
@@ -167,6 +212,7 @@ async function guardarDoctor() {
 
       await alertaExito("Doctor modificado con éxito");
       await limpiaFormdoc();
+      doctorStore.seleccionarDoctor(doctorModificado);
     } else {
       const doctorGuardado = await saveDoctor(datos);
       doctores.value.push(doctorGuardado);
@@ -174,6 +220,7 @@ async function guardarDoctor() {
 
       await alertaExito("Doctor gardado con éxito");
       await limpiaFormdoc();
+      doctorStore.seleccionarDoctor(doctorGuardado);
     }
   } catch (error) {
     console.error("Erro ao gardar o doctor:", error);
@@ -210,11 +257,16 @@ function corrixirApelido() {
   }
   
 function validarTelf() {
-  const telfRegex = /^[6|7]\d{8}$/;
+  const telfRegex = /^[67]\d{8}$/;
   if (novoDoctor.movildoc != "") {
     return telfRegex.test(novoDoctor.movildoc.trim());
   }
   return true;
+}
+
+// Deixa escribir só díxitos no campo do teléfono
+function validarMovilEnEntrada() {
+  novoDoctor.movildoc = novoDoctor.movildoc.replace(/\D/g, "");
 }
 
 async function cargarEspecialidades() {
@@ -245,6 +297,7 @@ async function buscarDoctor() {
   if (atopado) {
     Object.assign(novoDoctor, atopado);
     editando.value = true;
+    doctorStore.seleccionarDoctor(atopado);
   } else {
     alertaInfo("Non existe ningún doctor con ese ID");
   }
@@ -256,6 +309,7 @@ function editarDoctor(index) {
 
   Object.assign(novoDoctor, doctor);
   editando.value = true;
+  doctorStore.seleccionarDoctor(doctor);
 }
 
 async function eliminarDoctor(index) {
@@ -286,11 +340,12 @@ const limpiaFormdoc = () => {
     movildoc: "",
     coledoc: "",
     espedoc: "",
-    lodpac: false,
+    loddoc: false,
   });
   delete novoDoctor._id;
   delete novoDoctor.__v;
   editando.value = false;
+  doctorStore.limpiarDoctor();
 }
 
 </script>
@@ -350,6 +405,23 @@ form {
     align-items: center;
     justify-content: center;
 
+}
+
+.campo-colegiado {
+    align-items: center;
+}
+
+.campo .opcion-radio {
+    min-width: auto;
+    justify-content: flex-start;
+    gap: 0.3rem;
+    font-weight: 500;
+}
+
+.campo .opcion-radio input {
+    width: auto;
+    min-height: auto;
+    flex: 0 0 auto;
 }
 
 .campo input,
@@ -494,4 +566,29 @@ h4 {
         width: 100%;
     }
 }
+    .cabecera-listaxe {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .btn-pdf {
+        padding: 0.35rem 0.9rem;
+        border: 1px solid #d7ebe3;
+        border-radius: 8px;
+        background-color: #e8f7f1;
+        color: #173b2b;
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+
+    .btn-pdf:hover:not(:disabled) {
+        background-color: #d1f0e3;
+    }
+
+    .btn-pdf:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
 </style>

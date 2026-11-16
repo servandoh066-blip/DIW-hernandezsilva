@@ -7,6 +7,7 @@ import NotFound from '../components/NotFound.vue';
 import PoliticaPrivacidad from "../components/PoliticaPrivacidad.vue";
 import XestionDoctores from "../components/XestionDoctores.vue";
 import Citas from "../components/Citas.vue";
+import Servicios from "../components/Servicios.vue";
 import AvisoLegal from '../components/AvisoLegal.vue';
 
 
@@ -18,6 +19,7 @@ const routes = [
     {path: '/politica-privacidad', name: 'PoliticaPrivacidad', component: PoliticaPrivacidad},
     {path: '/xestion-doctores', name: 'XestionDoctores', component: XestionDoctores},
     {path: '/xestion-citas', name: 'Citas', component: Citas},
+    {path: '/servicios', name: 'Servicios', component: Servicios},
     {path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound},
 ]
 

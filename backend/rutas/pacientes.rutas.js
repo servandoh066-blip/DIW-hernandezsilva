@@ -40,19 +40,26 @@ router.get("/:dni", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
+    // Normalizamos el DNI: sin espacios y en mayúsculas
+    const dni = String(req.body.dnipac || "").trim().toUpperCase();
+
+    // Escape de caracteres especiales para usarlo seguro dentro del regex
+    const dniEscapado = dni.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    // Comprobamos duplicados sin importar mayúsculas/minúsculas
     const pacienteExistente = await Paciente.findOne({
-      dnipac: req.body.dnipac,
+      dnipac: { $regex: `^${dniEscapado}$`, $options: "i" },
     });
 
     if (pacienteExistente) {
-      return res.status(400).json({
+      return res.status(409).json({
         message: "El paciente con este DNI ya existe",
       });
     }
 
     // si no existe, se crea el paciente nuevo
     console.log("Datos recibidos:", req.body);
-    const paciente = new Paciente(req.body);
+    const paciente = new Paciente({ ...req.body, dnipac: dni });
 
     const nuevoPaciente = await paciente.save();
 
@@ -60,8 +67,11 @@ router.post("/", async (req, res) => {
   } catch (error) {
     console.error("Error al crear paciente:", error);
 
-    res.status(500).json({
+    // Si falla la validación del modelo devolvemos 400, no 500
+    const status = error.name === "ValidationError" ? 400 : 500;
+    res.status(status).json({
       message: "Error al crear paciente",
+      error: error.message,
     });
   }
 });
