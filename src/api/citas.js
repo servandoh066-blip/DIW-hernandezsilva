@@ -5,9 +5,10 @@ import axios from "axios"
 
 const API_URL = "http://localhost:3000/api";
 
-// Obtener todas las citas (con paciente y doctor ya resueltos)
-export async function getCitas() {
-    const res = await axios.get(`${API_URL}/citas`);
+// Devuelve las citas que coinciden con los filtros opcionales y propaga errores HTTP.
+export async function getCitas(filtros = {}) {
+    // Axios serializa los filtros como query params (pacienteDNI, doctorId...).
+    const res = await axios.get(`${API_URL}/citas`, { params: filtros });
     return res.data;
 }
 

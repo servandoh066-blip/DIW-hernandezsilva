@@ -120,6 +120,12 @@
           <td>{{ u.mailpac }}</td>
           <td>{{ u.propac }}</td>
           <td style="text-align: center;">
+            <button
+              @click="seleccionarPaciente(u)"
+              :title="pacienteStore.dnipac === u.dnipac ? 'Paciente seleccionado (desmarcar)' : 'Seleccionar para citas'"
+              :aria-label="pacienteStore.dnipac === u.dnipac ? 'Paciente seleccionado (desmarcar)' : 'Seleccionar para citas'"
+              :aria-pressed="pacienteStore.dnipac === u.dnipac"
+            >{{ pacienteStore.dnipac === u.dnipac ? '✅' : '👤' }}</button>
             <button @click="editarUsuario(index)" title="Editar">✏️</button>
             <button @click="eliminarPaciente(index)" title="Eliminar">🗑️</button>
           </td>
@@ -161,6 +167,9 @@ const municipios = ref([])
 
 const pacientes = ref([])  //almacena la lista de paciente e os seus cambios
 const editando = ref(false);
+
+// Selección actual do paciente (úsase en citas e para marcar a fila escollida)
+const pacienteStore = usepacienteStore()
 
 // Validacións en tempo real (avísanse mentres se escribe)
 const movilInvalido = computed(() => {
@@ -208,7 +217,11 @@ function ordenarPacientes() {
 }
 
 function seleccionarPaciente(paciente){
-  const pacienteStore = usepacienteStore();
+  // Se xa estaba seleccionado, desmarcar para poder ver todas as citas outra vez
+  if (pacienteStore.dnipac && pacienteStore.dnipac === paciente.dnipac) {
+    pacienteStore.limpiarPaciente();
+    return;
+  }
   pacienteStore.seleccionarPaciente(paciente);
 }
 

@@ -114,6 +114,12 @@
                         <td>{{ u.movildoc }}</td>
                         <td style="text-align: center;">{{ u.espedoc }}</td>
                         <td style="text-align: center;">
+                            <button
+                                @click="seleccionarDoctorFila(u)"
+                                :title="String(doctorStore.id) === String(u._id ?? u.iddoc) ? 'Doctor seleccionado (desmarcar)' : 'Seleccionar para citas'"
+                                :aria-label="String(doctorStore.id) === String(u._id ?? u.iddoc) ? 'Doctor seleccionado (desmarcar)' : 'Seleccionar para citas'"
+                                :aria-pressed="String(doctorStore.id) === String(u._id ?? u.iddoc)"
+                            >{{ String(doctorStore.id) === String(u._id ?? u.iddoc) ? '✅' : '👤' }}</button>
                             <button @click="editarDoctor(index)" title="Editar">
                                 ✏️
                             </button>
@@ -309,6 +315,16 @@ function editarDoctor(index) {
 
   Object.assign(novoDoctor, doctor);
   editando.value = true;
+  doctorStore.seleccionarDoctor(doctor);
+}
+
+// Marca o doctor da fila como seleccionado para citas (volver a pulsar desmarca)
+function seleccionarDoctorFila(doctor) {
+  const idActual = doctor._id ?? doctor.iddoc;
+  if (doctorStore.id && String(doctorStore.id) === String(idActual)) {
+    doctorStore.limpiarDoctor();
+    return;
+  }
   doctorStore.seleccionarDoctor(doctor);
 }
 

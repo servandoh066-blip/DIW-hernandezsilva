@@ -5,16 +5,15 @@
     </header>
 
     <form class="formulario-citas" @submit.prevent="gardarCita">
-      <!-- Fila 1: ID cita, data e botón de limpar -->
+      <!-- Fila 1: ID cita (xérase ao gardar), data e botón de limpar -->
       <div class="fila">
         <div class="campo">
           <label for="idcita">ID cita</label>
           <input
             id="idcita"
-            v-model.trim="cita.idcita"
+            :value="editandoId || 'Se xera ao gardar'"
             type="text"
-            placeholder="ID cita"
-            required
+            disabled
           />
         </div>
 
@@ -40,28 +39,38 @@
         </button>
       </div>
 
-      <!-- Fila 2: ID do paciente e ID do doctor -->
+      <!-- Fila 2: paciente e doctor, tomados da selección das súas pestañas -->
       <div class="fila">
         <div class="campo">
-          <label for="idpaciente">ID do paciente</label>
-          <input
-            id="idpaciente"
-            v-model.trim="cita.idpaciente"
-            type="text"
-            placeholder="ID do paciente"
-            required
-          />
+          <label for="paciente-cita">Paciente</label>
+          <select
+            id="paciente-cita"
+            :value="pacienteStore.dnipac || ''"
+            disabled
+          >
+            <option v-if="!pacienteStore.dnipac" value="">
+              Selecciona un paciente na súa pestana
+            </option>
+            <option v-else :value="pacienteStore.dnipac">
+              {{ pacienteStore.nomepac }} {{ pacienteStore.apelpac }} — {{ pacienteStore.dnipac }}
+            </option>
+          </select>
         </div>
 
         <div class="campo">
-          <label for="iddoctor">ID Doctor</label>
-          <input
-            id="iddoctor"
-            v-model.trim="cita.iddoctor"
-            type="text"
-            placeholder="ID Doctor"
-            required
-          />
+          <label for="doctor-cita">Doctor</label>
+          <select
+            id="doctor-cita"
+            :value="doctorStore.id || ''"
+            disabled
+          >
+            <option v-if="!doctorStore.id" value="">
+              Selecciona un doctor na súa pestana
+            </option>
+            <option v-else :value="doctorStore.id">
+              {{ doctorStore.nombre }} {{ doctorStore.apellido }} — {{ doctorStore.especialidad }}
+            </option>
+          </select>
         </div>
       </div>
 
@@ -84,7 +93,8 @@
             id="motivo"
             v-model.trim="cita.motivo"
             type="text"
-            placeholder="Motivo da cita"
+            maxlength="250"
+            placeholder="Describe brevemente o motivo"
             required
           />
         </div>
@@ -92,9 +102,10 @@
         <div class="campo">
           <label for="estado">Estado</label>
           <select id="estado" v-model="cita.estado">
-            <option value="Pendente">Pendente</option>
-            <option value="Completada">Completada</option>
-            <option value="Cancelada">Cancelada</option>
+            <option value="pendente">Pendente</option>
+            <option value="confirmada">Confirmada</option>
+            <option value="realizada">Realizada</option>
+            <option value="cancelada">Cancelada</option>
           </select>
         </div>
       </div>
@@ -107,14 +118,24 @@
             id="observacions"
             v-model.trim="cita.observacions"
             rows="4"
-            placeholder="Observacións adicionais"
+            maxlength="1000"
+            placeholder="Información opcional"
           ></textarea>
         </div>
       </div>
 
+      <!-- Indica que falta seleccionar paciente/doctor para poder gardar -->
+      <p v-if="faltanSeleccion.length" class="aviso-seleccion">
+        {{ avisoSeleccion }}
+      </p>
+
       <div class="botons-formulario">
-        <button type="submit" class="btn-gardar">
-          {{ editandoId ? "Actualizar" : "Gardar" }}
+        <button
+          type="submit"
+          class="btn-gardar"
+          :disabled="guardando || !formularioValido"
+        >
+          {{ guardando ? "Gardando…" : editandoId ? "Actualizar" : "Gardar" }}
         </button>
         <button
           v-if="editandoId"
@@ -127,96 +148,80 @@
       </div>
     </form>
 
-    <section class="listaxe">
-      <header class="cabecera-listaxe">
-        <h2>📑 Listaxe de Citas</h2>
-        <div class="accions-listaxe">
-          <button
-            type="button"
-            class="btn-pdf"
-            :disabled="citas.length === 0"
-            title="Exportar a PDF"
-            aria-label="Exportar a PDF"
-            @click="exportarPdf"
-          >
-            📄 PDF
-          </button>
-          <button
-            type="button"
-            class="btn-recargar"
-            title="Recargar listado"
-            aria-label="Recargar listado"
-            @click="cargarCitas"
-          >
-            ↻
-          </button>
-        </div>
-      </header>
+    <div class="cabecera-listaxe">
+      <h4>📋 Listaxe de citas</h4>
+      <button
+        type="button"
+        class="btn-pdf"
+        :disabled="citas.length === 0"
+        title="Exportar a PDF"
+        aria-label="Exportar a PDF"
+        @click="exportarPdf"
+      >
+        📄 Exportar PDF
+      </button>
+      <button
+        type="button"
+        class="btn-recargar"
+        :disabled="cargando"
+        title="Recargar listado"
+        aria-label="Recargar listado"
+        @click="cargarCitas"
+      >
+        ↻
+      </button>
+    </div>
 
-      <p v-if="citas.length === 0" class="estado-vacio">
-        Non hai citas cargadas ou falla a conexión coa BBDD.
-      </p>
+    <p v-if="cargando">
+      Cargando citas…
+    </p>
 
-      <div v-else class="taboa-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>ID cita</th>
-              <th>Data</th>
-              <th>Hora</th>
-              <th>ID paciente</th>
-              <th>ID doctor</th>
-              <th>Motivo</th>
-              <th>Estado</th>
-              <th>Observacións</th>
-              <th>Accións</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, index) in citas" :key="item._id || index">
-              <td>{{ item.idcita || item._id }}</td>
-              <td>{{ formatarData(item.fecha) }}</td>
-              <td>{{ item.hora }}</td>
-              <td>{{ idPacienteDe(item) || "—" }}</td>
-              <td>{{ idDoctorDe(item) || "—" }}</td>
-              <td>{{ item.motivo }}</td>
-              <td>
-                <span :class="['estado', `estado-${String(item.estado || '').toLowerCase()}`]">
-                  {{ item.estado }}
-                </span>
-              </td>
-              <td>{{ item.observacions || "—" }}</td>
-              <td class="cela-accions">
-                <button
-                  type="button"
-                  class="btn-accion"
-                  title="Editar"
-                  aria-label="Editar cita"
-                  @click="editarCita(item)"
-                >
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  class="btn-accion"
-                  title="Eliminar"
-                  aria-label="Eliminar cita"
-                  @click="eliminarCita(item)"
-                >
-                  🗑️
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <table v-else-if="citas.length">
+      <thead>
+        <tr>
+          <th>ID cita</th>
+          <th>Data</th>
+          <th>Hora</th>
+          <th>Paciente</th>
+          <th>Doctor</th>
+          <th>Motivo</th>
+          <th>Estado</th>
+          <th>Observacións</th>
+          <th>Accións</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(item, index) in citas" :key="item._id || index">
+          <td>{{ item.idcita || item._id }}</td>
+          <td>{{ formatarData(item.fecha) }}</td>
+          <td>{{ item.hora }}</td>
+          <td>{{ nombrePaciente(item) }}</td>
+          <td>{{ nombreDoctor(item) }}</td>
+          <td>{{ item.motivo }}</td>
+          <td>
+            <span :class="['estado', `estado-${String(item.estado || '').toLowerCase()}`]">
+              {{ etiquetaEstado(item.estado) }}
+            </span>
+          </td>
+          <td>{{ item.observacions || "—" }}</td>
+          <td style="text-align: center;">
+            <button @click="editarCita(item)" title="Editar" aria-label="Editar cita">✏️</button>
+            <button @click="eliminarCita(item)" title="Eliminar" aria-label="Eliminar cita">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p v-else>
+      Non hai citas que amosar.
+    </p>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { usepacienteStore } from "../store/pacienteStore";
+import { usedoctorStore } from "../store/doctorStore";
 import { getCitas, saveCita, modifyCita, deleteCita } from "../api/citas.js";
 import {
   alertaExito,
@@ -225,61 +230,124 @@ import {
 } from "../utils/alertas.js";
 import { exportarCitas } from "../utils/pdf.js";
 
-// Obxecto reactivo enlazado ao formulario mediante v-model
-const cita = ref({
-  idcita: "",
+// Seleccións feitas nas pestañas de pacientes e doctores
+const pacienteStore = usepacienteStore();
+const doctorStore = usedoctorStore();
+
+// Valores iniciais reutilizados polo formulario en altas e edicións
+const citaVacia = () => ({
   fecha: "",
-  idpaciente: "",
-  iddoctor: "",
   hora: "",
   motivo: "",
-  estado: "Pendente",
+  estado: "pendente",
   observacions: "",
 });
 
+const cita = ref(citaVacia());
 // Listaxe de citas amosada na parte inferior
 const citas = ref([]);
 // _id da cita que se está a editar, ou null se é unha alta
 const editandoId = ref(null);
-const pacienteStore = usepacienteStore();
+// Indicadores de carga e garda para evitar envíos duplicados
+const cargando = ref(false);
+const guardando = ref(false);
 
-// Se o backend aínda non está dispoñible, mantense a listaxe actual
-// e amósase a mensaxe de estado vacío.
+// Datos que faltan nas seleccións para poder crear ou editar
+const faltanSeleccion = computed(() => {
+  const faltan = [];
+  if (!pacienteStore.dnipac) faltan.push("o paciente");
+  if (!doctorStore.id) faltan.push("o doctor");
+  return faltan;
+});
+
+// Mensaxe contextual segundo o que faltseleccionar
+const avisoSeleccion = computed(() => {
+  if (faltanSeleccion.value.length === 2) {
+    return "Para crear ou editar unha cita, selecciona un paciente e un doctor nas súas pestanas. Mentres non haxa selección, o listado mostra todas as citas.";
+  }
+  return `Falta seleccionar ${faltanSeleccion.value.join(" e ")} nas súas pestanas. O listado está filtrado pola selección actual.`;
+});
+
+// Habilita o envío só cando os campos necesarios teñen conteúdo útil
+const formularioValido = computed(() =>
+  Boolean(
+    cita.value.fecha &&
+    cita.value.hora &&
+    pacienteStore.dnipac &&
+    doctorStore.id &&
+    cita.value.motivo.trim() &&
+    cita.value.estado,
+  ),
+);
+
+// Carga as citas, filtradas pola selección actual das pestañas
 async function cargarCitas() {
+  const dniInicial = pacienteStore.dnipac;
+  const idDoctorInicial = doctorStore.id;
+  cargando.value = true;
+
   try {
-    const datos = await getCitas();
-    citas.value = Array.isArray(datos) ? datos : [];
+    const datos = await getCitas({
+      pacienteDNI: dniInicial || undefined,
+      doctorId: idDoctorInicial || undefined,
+    });
+
+    // Ignora unha resposta tardía se mentres cambiou algunha selección
+    if (
+      String(pacienteStore.dnipac ?? "") !== String(dniInicial ?? "") ||
+      String(doctorStore.id ?? "") !== String(idDoctorInicial ?? "")
+    ) {
+      return;
+    }
+
+    // Segunda comprobación no cliente, por si o backend aínda non filtra
+    const lista = Array.isArray(datos) ? datos : [];
+    citas.value = lista.filter(
+      (item) =>
+        (!dniInicial ||
+          normalizarDNI(dniDe(item)) === normalizarDNI(dniInicial)) &&
+        (!idDoctorInicial || idDoctorDe(item) === String(idDoctorInicial)),
+    );
     ordenarCitas();
   } catch (erro) {
-    console.warn("Non se puideron cargar as citas:", erro);
+    console.error("Erro ao cargar as citas:", erro);
+    alertaError(mensajeError(erro, "Non se puideron cargar as citas."));
+  } finally {
+    cargando.value = false;
   }
 }
 
 // Garda a cita no backend (ou actualiza a que se está a editar)
 async function gardarCita() {
-  try {
-    const datos = { ...cita.value };
+  if (!formularioValido.value || guardando.value) return;
 
+  guardando.value = true;
+  const datos = {
+    pacienteId: pacienteStore.dnipac,
+    doctorId: doctorStore.id,
+    fecha: cita.value.fecha,
+    hora: cita.value.hora,
+    motivo: cita.value.motivo.trim(),
+    observacions: (cita.value.observacions || "").trim(),
+    estado: cita.value.estado,
+  };
+
+  try {
     if (editandoId.value) {
-      const actualizada = await modifyCita(editandoId.value, datos);
-      const index = citas.value.findIndex(
-        (item) => item._id === editandoId.value,
-      );
-      if (index !== -1) {
-        citas.value[index] = actualizada;
-      }
-      alertaExito("Cita actualizada con éxito");
+      await modifyCita(editandoId.value, datos);
+      await alertaExito("Cita actualizada con éxito");
     } else {
-      const nova = await saveCita(datos);
-      citas.value.push(nova);
-      alertaExito("Cita gardada con éxito");
+      await saveCita(datos);
+      await alertaExito("Cita gardada con éxito");
     }
 
-    ordenarCitas();
     limparFormulario();
+    await cargarCitas();
   } catch (erro) {
     console.error("Erro ao gardar a cita:", erro);
-    alertaError(erro?.response?.data?.message || "Non se puido gardar a cita");
+    alertaError(mensajeError(erro, "Non se puido gardar a cita"));
+  } finally {
+    guardando.value = false;
   }
 }
 
@@ -287,53 +355,42 @@ async function gardarCita() {
 function editarCita(item) {
   editandoId.value = item._id;
   Object.assign(cita.value, {
-    idcita: item.idcita || "",
     fecha: fechaParaInput(item.fecha),
-    idpaciente: idPacienteDe(item),
-    iddoctor: idDoctorDe(item),
     hora: item.hora || "",
     motivo: item.motivo || "",
-    estado: item.estado || "Pendente",
     observacions: item.observacions || "",
+    estado: normalizarEstado(item.estado),
   });
 }
 
 // Pide confirmación e elimina a cita do backend
 async function eliminarCita(item) {
   const confirmacion = await alertaConfirmacion(
-    "Esta acción non ten volta atrás",
-    "¿Seguro que queres eliminar esta cita?",
+    `¿Eliminar a cita do ${formatarData(item.fecha)} ás ${item.hora}?`,
+    "Eliminar cita",
   );
 
   if (!confirmacion.isConfirmed) return;
 
   try {
     await deleteCita(item._id);
-    citas.value = citas.value.filter((citaItem) => citaItem._id !== item._id);
 
     if (editandoId.value === item._id) {
       limparFormulario();
     }
 
-    alertaExito("Cita eliminada con éxito");
+    await alertaExito("Cita eliminada con éxito");
+    await cargarCitas();
   } catch (erro) {
     console.error("Erro ao eliminar a cita:", erro);
-    alertaError(erro?.response?.data?.message || "Non se puido eliminar a cita");
+    alertaError(mensajeError(erro, "Non se puido eliminar a cita"));
   }
 }
 
+// Restablece o formulario e termina o modo de edición
 function limparFormulario() {
   editandoId.value = null;
-  Object.assign(cita.value, {
-    idcita: "",
-    fecha: "",
-    idpaciente: "",
-    iddoctor: "",
-    hora: "",
-    motivo: "",
-    estado: "Pendente",
-    observacions: "",
-  });
+  cita.value = citaVacia();
 }
 
 // Mantén a listaxe ordenada por data e hora, igual que a devolve o backend
@@ -345,8 +402,8 @@ function ordenarCitas() {
   });
 }
 
-// As referencias veñen xa resoltas co populate; senón, devólvese o id cru
-function idPacienteDe(item) {
+// DNI da cita: a referencia veñen resolta co populate; senón, o valor cru
+function dniDe(item) {
   const referencia = item.pacienteId;
   if (referencia && typeof referencia === "object") {
     return referencia.dnipac || "";
@@ -354,12 +411,60 @@ function idPacienteDe(item) {
   return referencia || "";
 }
 
+// _id do doctor da cita, tanto se veñen poboado como cru
 function idDoctorDe(item) {
   const referencia = item.doctorId;
   if (referencia && typeof referencia === "object") {
-    return referencia.iddoc || "";
+    return String(referencia._id ?? "");
   }
-  return referencia || "";
+  return String(referencia ?? "");
+}
+
+// Nome completo do paciente para amosar na fila
+function nombrePaciente(item) {
+  const referencia = item.pacienteId;
+  if (referencia && typeof referencia === "object") {
+    const nome = `${referencia.nomepac ?? ""} ${referencia.apelpac ?? ""}`.trim();
+    if (!nome) return "—";
+    return referencia.dnipac ? `${nome} (${referencia.dnipac})` : nome;
+  }
+  return referencia || "—";
+}
+
+// Nome e especialidade do doctor para amosar na fila
+function nombreDoctor(item) {
+  const referencia = item.doctorId;
+  if (referencia && typeof referencia === "object") {
+    const nome = `${referencia.nomedoc ?? ""} ${referencia.apeldoc ?? ""}`.trim();
+    if (!nome) return "—";
+    return referencia.espedoc ? `${nome} — ${referencia.espedoc}` : nome;
+  }
+  return referencia || "—";
+}
+
+function normalizarDNI(dni) {
+  return String(dni ?? "").trim().toUpperCase();
+}
+
+// Converte calquera variante gardada no código de estado do formulario
+function normalizarEstado(estado) {
+  const codigo = String(estado ?? "").trim().toLowerCase();
+  const validos = ["pendente", "confirmada", "realizada", "cancelada", "completada"];
+  return validos.includes(codigo) ? codigo : "pendente";
+}
+
+// Converte o código interno de estado nunha etiqueta legible
+function etiquetaEstado(estado) {
+  const etiquetas = {
+    pendente: "Pendente",
+    confirmada: "Confirmada",
+    realizada: "Realizada",
+    completada: "Completada",
+    cancelada: "Cancelada",
+  };
+  const codigo = String(estado ?? "").trim().toLowerCase();
+  if (etiquetas[codigo]) return etiquetas[codigo];
+  return estado || "—";
 }
 
 // Mongo pode gardar a data como ISO con hora; o input type="date" só acepta AAAA-MM-DD
@@ -382,8 +487,17 @@ function formatarData(data) {
   return `${dia}/${mes}/${ano}`;
 }
 
+// Extrae a mensaxe do backend desde Axios ou devolve o texto alternativo
+function mensajeError(erro, porDefecto) {
+  return (
+    erro?.response?.data?.message ||
+    erro?.response?.data?.mensaje ||
+    porDefecto
+  );
+}
+
 // Descarga a listaxe actual en PDF
-async function exportarPdf() {
+function exportarPdf() {
   try {
     exportarCitas(citas.value);
   } catch (erro) {
@@ -392,9 +506,15 @@ async function exportarPdf() {
   }
 }
 
+// Ao abrir a pantalla cárgase a listaxe coa selección que haxa
 onMounted(async () => {
   await cargarCitas();
-  cita.value.idpaciente = pacienteStore.dnipac || "";
+});
+
+// Se cambia a selección de paciente ou doctor, réstase o formulario e recárgase
+watch(() => [pacienteStore.dnipac, doctorStore.id], async () => {
+  limparFormulario();
+  await cargarCitas();
 });
 </script>
 
@@ -481,6 +601,13 @@ onMounted(async () => {
   box-sizing: border-box;
 }
 
+.campo input:disabled,
+.campo select:disabled {
+  background-color: #f1f5f3;
+  color: #6b7770;
+  cursor: not-allowed;
+}
+
 .campo textarea {
   min-height: 110px;
   resize: vertical;
@@ -509,6 +636,17 @@ onMounted(async () => {
   background-color: #e8f7f1;
 }
 
+.aviso-seleccion {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #f2e3b8;
+  border-radius: 8px;
+  background-color: #fff9ea;
+  color: #8a6100;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .btn-gardar {
   align-self: center;
   margin-top: 0.25rem;
@@ -522,8 +660,13 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.btn-gardar:hover {
+.btn-gardar:hover:not(:disabled) {
   background-color: #129662;
+}
+
+.btn-gardar:disabled {
+  background-color: #a8dcc7;
+  cursor: not-allowed;
 }
 
 .botons-formulario {
@@ -548,121 +691,63 @@ onMounted(async () => {
   background-color: #e8f7f1;
 }
 
-.listaxe {
-  border: 1px solid #d7ebe3;
-  border-radius: 10px;
-  overflow: hidden;
-  background-color: #ffffff;
-}
-
 .cabecera-listaxe {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.8rem 1rem;
+}
+
+.cabecera-listaxe h4 {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 1rem;
+  font-weight: 600;
   background-color: #17b473;
-  color: #ffffff;
+  color: white;
 }
 
-.cabecera-listaxe h2 {
-  margin: 0;
-  color: #ffffff;
-  font-size: 1.1rem;
-}
-
+.btn-pdf,
 .btn-recargar {
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  font-size: 1.2rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.btn-recargar:hover {
-  background-color: rgba(255, 255, 255, 0.32);
-}
-
-.accions-listaxe {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-pdf {
   padding: 0.35rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid #d7ebe3;
   border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background-color: #e8f7f1;
+  color: #173b2b;
   font-size: 0.85rem;
   cursor: pointer;
 }
 
-.btn-pdf:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.32);
+.btn-pdf:hover:not(:disabled),
+.btn-recargar:hover:not(:disabled) {
+  background-color: #d1f0e3;
 }
 
-.btn-pdf:disabled {
+.btn-pdf:disabled,
+.btn-recargar:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-.cela-accions {
-  white-space: nowrap;
-}
-
-.btn-accion {
-  margin: 0 0.15rem;
-  padding: 0.2rem 0.35rem;
-  border: none;
-  border-radius: 6px;
-  background-color: transparent;
-  cursor: pointer;
-}
-
-.btn-accion:hover {
-  background-color: #e8f7f1;
-}
-
-.estado-vacio {
-  margin: 0;
-  padding: 1.5rem 1rem;
-  color: #555555;
-  text-align: center;
-}
-
-.taboa-wrapper {
-  overflow-x: auto;
-}
-
 table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
+  border-collapse: separate;
+  align-self: center;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  border: 1px solid #ddd;
 }
 
 th,
 td {
+  border: 1px solid #ddd;
   padding: 0.7rem;
-  border-bottom: 1px solid #e1ece7;
   text-align: left;
-  white-space: nowrap;
 }
 
 th {
-  background-color: #e8f7f1;
-  color: #333333;
-  font-weight: 600;
-}
-
-tbody tr:hover {
-  background-color: #f7fbf9;
+  text-align: center;
+  background-color: #f8f9fa;
 }
 
 .estado {
@@ -676,6 +761,16 @@ tbody tr:hover {
 .estado-pendente {
   background-color: #fff4d6;
   color: #8a6100;
+}
+
+.estado-confirmada {
+  background-color: #dceafa;
+  color: #1f5f9e;
+}
+
+.estado-realizada {
+  background-color: #d9f5e8;
+  color: #0f6b45;
 }
 
 .estado-completada {
