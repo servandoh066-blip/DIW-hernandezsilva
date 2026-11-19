@@ -7,14 +7,12 @@ import Doctor from "../modelos/Doctor.js";
 const router = express.Router();
 
 // Campos que interesan ao frontend para amosar cada referencia
-const camposPaciente = "dnipac nomepac apelpac";
 const camposDoutor = "iddoc nomedoc apeldoc espedoc";
 
 // Lista blanca de propiedades que se aceptan al crear o editar una cita.
 // Descarta campos no admitidos para evitar guardar propiedades arbitrarias.
 const camposCita = [
-    "idcita",
-    "pacienteId",
+    "pacienteDNI",
     "doctorId",
     "fecha",
     "hora",
@@ -32,11 +30,9 @@ function datosPermitidos(body) {
     );
 }
 
-// Devolve a consulta co paciente e o doutor xa resoltos (e non só os _id)
+// Devolve a consulta co doutor xa resolvido (e non só o _id)
 function conReferencias(consulta) {
-    return consulta
-        .populate("pacienteId", camposPaciente)
-        .populate("doctorId", camposDoutor);
+    return consulta.populate("doctorId", camposDoutor);
 }
 
 // Escape de caracteres especiais para usalo dentro dun regex
@@ -72,8 +68,8 @@ async function buscarDoctor(valor) {
     return Doctor.findOne({ iddoc: texto });
 }
 
-// O formulario manda o DNI do paciente (ou o seu _id); a cita garda o _id
-async function resolverPacienteId(valor) {
+// O formulario manda o DNI do paciente; a cita garda ese DNI como texto
+async function resolverPacienteDNI(valor) {
     const paciente = await buscarPacientePorDNI(valor);
 
     if (!paciente) {
@@ -82,7 +78,7 @@ async function resolverPacienteId(valor) {
         throw erro;
     }
 
-    return paciente._id;
+    return paciente.dnipac;
 }
 
 // O formulario manda o ID do doctor (iddoc) ou o seu _id; a cita garda o _id
@@ -98,7 +94,7 @@ async function resolverDoctorId(valor) {
     return doctor._id;
 }
 
-// Convierte el error en respuesta:400 para validación, 500 para el resto.
+// Convierte el error en respuesta: 400 para validación, 500 para el resto.
 function responderErro(res, error, porDefecto) {
     if (error.status) {
         return res.status(error.status).json({ message: error.message });
@@ -117,10 +113,13 @@ router.get("/", async (req, res) => {
     try {
         const filtros = {};
 
-        // Filtro por paciente: resólvese o DNI a _id; sen coincidencias devólvese baleiro.
+        // Filtro por paciente: compara o DNI gardado sen importar maiúsculas.
         if (req.query.pacienteDNI) {
-            const paciente = await buscarPacientePorDNI(req.query.pacienteDNI);
-            filtros.pacienteId = paciente ? paciente._id : null;
+            const texto = String(req.query.pacienteDNI).trim();
+            filtros.pacienteDNI = {
+                $regex: `^${escapeRegex(texto)}$`,
+                $options: "i",
+            };
         }
 
         // Filtro por doctor: acepta _id ou iddoc; id inexistente devolve baleiro.
@@ -143,17 +142,18 @@ router.post("/", async (req, res) => {
     try {
         const datos = datosPermitidos(req.body);
 
-        // Acepta tanto os nomes do esquema (pacienteId/doctorId) como os do
-        // formulario antigo (idpaciente/iddoctor con DNI e iddoc).
-        const valorPaciente = datos.pacienteId ?? req.body?.idpaciente;
+        // Acepta o nome do esquema (pacienteDNI) e os aliases antigos
+        // (pacienteId/idpaciente) que traían o DNI do formulario.
+        const valorPaciente =
+            datos.pacienteDNI ?? req.body?.pacienteId ?? req.body?.idpaciente;
         const valorDoctor = datos.doctorId ?? req.body?.iddoctor;
 
-        const [pacienteId, doctorId] = await Promise.all([
-            resolverPacienteId(valorPaciente),
+        const [pacienteDNI, doctorId] = await Promise.all([
+            resolverPacienteDNI(valorPaciente),
             resolverDoctorId(valorDoctor),
         ]);
 
-        const datosFinales = { ...datos, pacienteId, doctorId };
+        const datosFinales = { ...datos, pacienteDNI, doctorId };
 
         const cita = await Cita.create(datosFinales);
         const citaCompleta = await conReferencias(Cita.findById(cita._id));
@@ -170,10 +170,10 @@ router.put("/:id", async (req, res) => {
         const datos = datosPermitidos(req.body);
 
         // Só se resolven as referencias se o corpo as trae
-        if (datos.pacienteId !== undefined || req.body?.idpaciente !== undefined) {
-            datos.pacienteId = await resolverPacienteId(
-                datos.pacienteId ?? req.body.idpaciente,
-            );
+        const corpoPaciente =
+            datos.pacienteDNI ?? req.body?.pacienteId ?? req.body?.idpaciente;
+        if (corpoPaciente !== undefined) {
+            datos.pacienteDNI = await resolverPacienteDNI(corpoPaciente);
         }
         if (datos.doctorId !== undefined || req.body?.iddoctor !== undefined) {
             datos.doctorId = await resolverDoctorId(

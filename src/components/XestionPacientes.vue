@@ -77,27 +77,40 @@
           </a>
         </label>
       </div>
-      <button type="submit" class="btn-guardar" :disabled="
-        novoPaciente.dnipac === '' ||
-        novoPaciente.nomepac === '' ||
-        novoPaciente.apelpac === '' ||
-        novoPaciente.movilpac === '' ||
-        !novoPaciente.lodpac
-        ">
-        Gardar
-      </button>
+      <div class="botons-formulario">
+        <button type="submit" class="btn-guardar" :disabled="
+          novoPaciente.dnipac === '' ||
+          novoPaciente.nomepac === '' ||
+          novoPaciente.apelpac === '' ||
+          novoPaciente.movilpac === '' ||
+          !novoPaciente.lodpac
+          ">
+          Gardar
+        </button>
+        <button
+          type="button"
+          class="btn-pdf"
+          :disabled="pacientes.length === 0"
+          title="Exportar a PDF"
+          aria-label="Exportar a PDF"
+          @click="exportarPdf"
+        >
+          📄 Exportar PDF
+        </button>
+        <button
+          type="button"
+          class="btn-recargar"
+          :disabled="cargando"
+          title="Recargar listado"
+          aria-label="Recargar listado"
+          @click="cargarPacientes"
+        >
+          ↻
+        </button>
+      </div>
     </form>
     <div class="cabecera-listaxe">
       <h4>📋 Listaxe de pacientes</h4>
-      <button
-        type="button"
-        class="btn-pdf"
-        :disabled="pacientes.length === 0"
-        title="Exportar a PDF"
-        @click="exportarPdf"
-      >
-        📄 Exportar PDF
-      </button>
     </div>
     <table v-if="pacientes.length > 0">
       <thead>
@@ -199,10 +212,26 @@ const novoPaciente = reactive({
 
 /// Zona de ciclo de vida
 
+// Indicador de carga para o botón de recargar
+const cargando = ref(false);
+
+// Carga o listaxe de pacientes dende o backend
+async function cargarPacientes() {
+  cargando.value = true;
+  try {
+    pacientes.value = await getPacientes();
+    ordenarPacientes();
+  } catch (erro) {
+    console.error("Erro ao cargar os pacientes:", erro);
+    pacientes.value = [];
+  } finally {
+    cargando.value = false;
+  }
+}
+
 onMounted(async () => {
   provincias.value = await obtenerProvincias();
-  pacientes.value = await getPacientes(); //carga os pacientes desde o backend
-  ordenarPacientes();
+  await cargarPacientes();
 })
 
 // Mantén a listaxe ordenada por apelidos e nome (igual que o listado de doctores)
@@ -726,6 +755,37 @@ h4 {
 }
 
 .btn-pdf:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Fila de botóns do formulario: gardar, PDF e recargar xuntos */
+.botons-formulario {
+  display: flex;
+  align-self: center;
+  margin-top: 0.25rem;
+  gap: 0.75rem;
+}
+
+.botons-formulario .btn-guardar {
+  margin: 0;
+}
+
+.btn-recargar {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid #d7ebe3;
+  border-radius: 8px;
+  background-color: #e8f7f1;
+  color: #173b2b;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-recargar:hover:not(:disabled) {
+  background-color: #d1f0e3;
+}
+
+.btn-recargar:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }

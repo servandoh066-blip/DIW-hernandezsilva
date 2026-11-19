@@ -69,30 +69,43 @@
                     </a>
                 </label>
             </div>
-            <button 
-                type="submit" 
-                class="btn-guardar" 
-                :disabled="novoDoctor.nomedoc === '' ||
-                    novoDoctor.apeldoc === '' ||
-                    !novoDoctor.espedoc ||
-                    !novoDoctor.loddoc
-                ">
-                {{ editando ? 'Actualizar' : 'Gardar' }}
-            </button>
+            <div class="botons-formulario">
+                <button 
+                    type="submit" 
+                    class="btn-guardar" 
+                    :disabled="novoDoctor.nomedoc === '' ||
+                        novoDoctor.apeldoc === '' ||
+                        !novoDoctor.espedoc ||
+                        !novoDoctor.loddoc
+                    ">
+                    {{ editando ? 'Actualizar' : 'Gardar' }}
+                </button>
+                <button
+                    type="button"
+                    class="btn-pdf"
+                    :disabled="doctores.length === 0"
+                    title="Exportar a PDF"
+                    aria-label="Exportar a PDF"
+                    @click="exportarPdf"
+                >
+                    📄 Exportar PDF
+                </button>
+                <button
+                    type="button"
+                    class="btn-recargar"
+                    :disabled="cargando"
+                    title="Recargar listado"
+                    aria-label="Recargar listado"
+                    @click="cargarDoctores"
+                >
+                    ↻
+                </button>
+            </div>
         </form>
         <div class="cabecera-listaxe">
             <h4>📋 Listaxe de doctores</h4>
-            <button
-                type="button"
-                class="btn-pdf"
-                :disabled="doctores.length === 0"
-                title="Exportar a PDF"
-                @click="exportarPdf"
-            >
-                📄 Exportar PDF
-            </button>
         </div>
-        <div v-if="doctores.length > 0" class="taboa-wrapper">
+        <div v-if="doctores.length > 0" class="taboa-lista">
             <table>
                 <thead>
                     <tr>
@@ -279,12 +292,19 @@ async function cargarEspecialidades() {
   especialidades.value = await obtenerEspecialidades()
 }
 
+// Indicador de carga para o botón de recargar
+const cargando = ref(false)
+
+// Carga o listaxe de doctores dende o backend
 async function cargarDoctores() {
+  cargando.value = true
   try {
     doctores.value = await getDoctores()
   } catch (error) {
     console.error("Erro ao cargar os doctores:", error)
     doctores.value = []
+  } finally {
+    cargando.value = false
   }
 }
 
@@ -376,7 +396,6 @@ const limpiaFormdoc = () => {
 
 .xestion-doctor {
     width: 100%;
-    max-width: 1100px;
     margin: 0 auto;
     background: #ffffff; /* Corregido: forzado a blanco */
     color: #333333;      /* Corregido: texto visible */
@@ -531,14 +550,16 @@ form {
 
 table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    align-self: center;
+    margin-top: 1rem;
     font-size: 0.8rem;
     border: 1px solid #ddd;
 }
 
-/* O wrapper ocupa todo o ancho da sección e permíte scroll horizontal
-   en pantallas pequenas sen romper o ancho da táboa. */
-.taboa-wrapper {
+/* Wrapper con scroll horizontal en pantallas pequenas (mesmo estilo
+   que as táboas de citas e pacientes). */
+.taboa-lista {
     width: 100%;
     margin-top: 1rem;
     overflow-x: auto;
@@ -549,7 +570,6 @@ td {
     border: 1px solid #ddd;
     padding: 0.7rem;
     text-align: left;
-    white-space: nowrap;
 }
 
 th {
@@ -582,29 +602,45 @@ h4 {
         width: 100%;
     }
 }
-    .cabecera-listaxe {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-    }
 
-    .btn-pdf {
-        padding: 0.35rem 0.9rem;
-        border: 1px solid #d7ebe3;
-        border-radius: 8px;
-        background-color: #e8f7f1;
-        color: #173b2b;
-        font-size: 0.85rem;
-        cursor: pointer;
-    }
+.cabecera-listaxe {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
 
-    .btn-pdf:hover:not(:disabled) {
-        background-color: #d1f0e3;
-    }
+/* Fila de botóns do formulario: gardar, PDF e recargar xuntos */
+.botons-formulario {
+    display: flex;
+    align-self: center;
+    margin-top: 0.25rem;
+    gap: 0.75rem;
+}
 
-    .btn-pdf:disabled {
-        cursor: not-allowed;
-        opacity: 0.5;
-    }
+.botons-formulario .btn-guardar {
+    margin: 0;
+}
+
+.btn-pdf,
+.btn-recargar {
+    padding: 0.35rem 0.9rem;
+    border: 1px solid #d7ebe3;
+    border-radius: 8px;
+    background-color: #e8f7f1;
+    color: #173b2b;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn-pdf:hover:not(:disabled),
+.btn-recargar:hover:not(:disabled) {
+    background-color: #d1f0e3;
+}
+
+.btn-pdf:disabled,
+.btn-recargar:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
 </style>

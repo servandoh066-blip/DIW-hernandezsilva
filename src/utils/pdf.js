@@ -110,31 +110,15 @@ export function exportarDoctores(doctores) {
   })
 }
 
-// as referencias veñen xa resoltas co populate; se non, móstrase o id
-function nomeDeReferencia(referencia, campos) {
-  if (referencia && typeof referencia === 'object') {
-    const nome = `${campos.nome(referencia)} ${campos.apelido(referencia)}`.trim()
-    return nome || '(eliminado)'
-  }
-  return referencia || '(eliminado)'
-}
-
+// Rexistro do PDF coas mesmas columnas que amosa o listaxe da pantalla
 export function exportarCitas(citas) {
   construirPdf({
     titulo: 'Listaxe de citas',
-    cabeceiras: ['Data', 'Hora', 'Paciente', 'Doutor', 'Especialidade', 'Motivo', 'Estado'],
+    cabeceiras: ['ID cita', 'Data', 'Hora', 'Motivo', 'Estado'],
     filas: citas.map((cita) => [
+      cita.idcita ?? cita._id ?? '',
       formatarData(cita.fecha),
       cita.hora ?? '',
-      nomeDeReferencia(cita.pacienteId, {
-        nome: (p) => p.nomepac ?? '',
-        apelido: (p) => p.apelpac ?? ''
-      }),
-      nomeDeReferencia(cita.doctorId, {
-        nome: (d) => d.nomedoc ?? '',
-        apelido: (d) => d.apeldoc ?? ''
-      }),
-      cita.doctorId && typeof cita.doctorId === 'object' ? cita.doctorId.espedoc ?? '' : '',
       cita.motivo ?? '',
       cita.estado ?? ''
     ]),

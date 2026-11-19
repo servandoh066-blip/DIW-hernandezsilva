@@ -11,7 +11,7 @@
           <label for="idcita">ID cita</label>
           <input
             id="idcita"
-            :value="editandoId || 'Se xera ao gardar'"
+            :value="editandoId || '—'"
             type="text"
             disabled
           />
@@ -138,6 +138,26 @@
           {{ guardando ? "Gardando…" : editandoId ? "Actualizar" : "Gardar" }}
         </button>
         <button
+          type="button"
+          class="btn-pdf"
+          :disabled="citas.length === 0"
+          title="Exportar a PDF"
+          aria-label="Exportar a PDF"
+          @click="exportarPdf"
+        >
+          📄 Exportar PDF
+        </button>
+        <button
+          type="button"
+          class="btn-recargar"
+          :disabled="cargando"
+          title="Recargar listado"
+          aria-label="Recargar listado"
+          @click="cargarCitas"
+        >
+          ↻
+        </button>
+        <button
           v-if="editandoId"
           type="button"
           class="btn-cancelar"
@@ -150,26 +170,6 @@
 
     <div class="cabecera-listaxe">
       <h4>📋 Listaxe de citas</h4>
-      <button
-        type="button"
-        class="btn-pdf"
-        :disabled="citas.length === 0"
-        title="Exportar a PDF"
-        aria-label="Exportar a PDF"
-        @click="exportarPdf"
-      >
-        📄 Exportar PDF
-      </button>
-      <button
-        type="button"
-        class="btn-recargar"
-        :disabled="cargando"
-        title="Recargar listado"
-        aria-label="Recargar listado"
-        @click="cargarCitas"
-      >
-        ↻
-      </button>
     </div>
 
     <p v-if="cargando">
@@ -182,11 +182,8 @@
           <th>ID cita</th>
           <th>Data</th>
           <th>Hora</th>
-          <th>Paciente</th>
-          <th>Doctor</th>
           <th>Motivo</th>
           <th>Estado</th>
-          <th>Observacións</th>
           <th>Accións</th>
         </tr>
       </thead>
@@ -195,15 +192,12 @@
           <td>{{ item.idcita || item._id }}</td>
           <td>{{ formatarData(item.fecha) }}</td>
           <td>{{ item.hora }}</td>
-          <td>{{ nombrePaciente(item) }}</td>
-          <td>{{ nombreDoctor(item) }}</td>
           <td>{{ item.motivo }}</td>
           <td>
             <span :class="['estado', `estado-${String(item.estado || '').toLowerCase()}`]">
               {{ etiquetaEstado(item.estado) }}
             </span>
           </td>
-          <td>{{ item.observacions || "—" }}</td>
           <td style="text-align: center;">
             <button @click="editarCita(item)" title="Editar" aria-label="Editar cita">✏️</button>
             <button @click="eliminarCita(item)" title="Eliminar" aria-label="Eliminar cita">🗑️</button>
@@ -323,7 +317,7 @@ async function gardarCita() {
 
   guardando.value = true;
   const datos = {
-    pacienteId: pacienteStore.dnipac,
+    pacienteDNI: pacienteStore.dnipac,
     doctorId: doctorStore.id,
     fecha: cita.value.fecha,
     hora: cita.value.hora,
@@ -402,13 +396,9 @@ function ordenarCitas() {
   });
 }
 
-// DNI da cita: a referencia veñen resolta co populate; senón, o valor cru
+// DNI da cita (campo pacienteDNI do esquema)
 function dniDe(item) {
-  const referencia = item.pacienteId;
-  if (referencia && typeof referencia === "object") {
-    return referencia.dnipac || "";
-  }
-  return referencia || "";
+  return item.pacienteDNI || "";
 }
 
 // _id do doctor da cita, tanto se veñen poboado como cru
@@ -418,28 +408,6 @@ function idDoctorDe(item) {
     return String(referencia._id ?? "");
   }
   return String(referencia ?? "");
-}
-
-// Nome completo do paciente para amosar na fila
-function nombrePaciente(item) {
-  const referencia = item.pacienteId;
-  if (referencia && typeof referencia === "object") {
-    const nome = `${referencia.nomepac ?? ""} ${referencia.apelpac ?? ""}`.trim();
-    if (!nome) return "—";
-    return referencia.dnipac ? `${nome} (${referencia.dnipac})` : nome;
-  }
-  return referencia || "—";
-}
-
-// Nome e especialidade do doctor para amosar na fila
-function nombreDoctor(item) {
-  const referencia = item.doctorId;
-  if (referencia && typeof referencia === "object") {
-    const nome = `${referencia.nomedoc ?? ""} ${referencia.apeldoc ?? ""}`.trim();
-    if (!nome) return "—";
-    return referencia.espedoc ? `${nome} — ${referencia.espedoc}` : nome;
-  }
-  return referencia || "—";
 }
 
 function normalizarDNI(dni) {
@@ -521,7 +489,6 @@ watch(() => [pacienteStore.dnipac, doctorStore.id], async () => {
 <style scoped>
 .xestion-citas {
   width: 100%;
-  max-width: 1100px;
   margin: 0 auto;
   padding: 1rem;
   background-color: #ffffff;
